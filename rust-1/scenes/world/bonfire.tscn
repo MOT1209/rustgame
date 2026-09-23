@@ -1,0 +1,25 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/bonfire.gd" id="1_bonfire"]
+[ext_resource type="PackedScene" path="res://assets/models/pack/Bonfire.glb" id="2_model"]
+
+[sub_resource type="CylinderShape3D" id="fire_shape"]
+radius = 0.9
+height = 0.7
+
+[node name="Bonfire" type="StaticBody3D"]
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_bonfire")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+shape = SubResource("fire_shape")
+
+[node name="BonfireLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+light_color = Color(1, 0.6, 0.3, 1)
+light_energy = 2.0
+omni_range = 10.0

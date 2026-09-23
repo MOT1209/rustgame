@@ -1,0 +1,18 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/tent.gd" id="1_tent"]
+[ext_resource type="PackedScene" path="res://assets/models/pack/Tent.glb" id="2_model"]
+
+[sub_resource type="BoxShape3D" id="tent_shape"]
+size = Vector3(3, 2.5, 3.5)
+
+[node name="Tent" type="StaticBody3D"]
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_tent")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0)
+shape = SubResource("tent_shape")

@@ -9,6 +9,13 @@ const TIER_DATA := {
 	"Armored": {"health": 2000.0, "color": Color(0.85, 0.88, 0.95)},
 }
 
+const UPGRADE_COSTS := {
+	"Wood": {"wood": 20},
+	"Stone": {"wood": 10, "stone": 30},
+	"Sheet Metal": {"stone": 40, "wood": 20},
+	"Armored": {"stone": 80, "wood": 40},
+}
+
 var tier: String = "Twig"
 var health: float = TIER_DATA["Twig"]["health"]
 var max_health: float = TIER_DATA["Twig"]["health"]
@@ -19,12 +26,29 @@ var max_health: float = TIER_DATA["Twig"]["health"]
 func _ready() -> void:
 	_apply_tier()
 
-func upgrade() -> void:
+func next_tier() -> String:
 	var order := TIER_DATA.keys()
 	var index := order.find(tier)
 	if index >= 0 and index < order.size() - 1:
-		tier = order[index + 1]
-		_apply_tier()
+		return order[index + 1]
+	return ""
+
+func upgrade() -> bool:
+	var target := next_tier()
+	if target.is_empty():
+		GameEvents.show_message("Already max tier.")
+		return false
+	var cost: Dictionary = UPGRADE_COSTS.get(target, {})
+	for item in cost:
+		if not Inventory.has(item, cost[item]):
+			GameEvents.show_message("Need %d %s to upgrade." % [cost[item], item])
+			return false
+	for item in cost:
+		Inventory.consume(item, cost[item])
+	tier = target
+	_apply_tier()
+	GameEvents.show_message("Upgraded to %s." % tier)
+	return true
 
 func _apply_tier() -> void:
 	health = TIER_DATA[tier]["health"]
