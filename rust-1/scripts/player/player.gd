@@ -1,6 +1,6 @@
 extends CharacterBody3D
-## Player controller (Phase 1-4).
-## Handles movement, jump, sprint, third-person camera orbit and building.
+## Player controller (Phase 1-5).
+## Handles movement, jump, sprint, third-person camera orbit, GLB model animation and building.
 
 const WALK_SPEED := 4.5
 const RUN_SPEED := 8.0
@@ -13,9 +13,13 @@ const BUILDING_SIZE := 3.0
 const BUILD_RANGE := 12.0
 const BUILD_TARGET_CAMERA_LAYER := 1  # world/terrain layer
 
+const STATE_IDLE := "Idle"
+const STATE_WALK := "Walk"
+
 @onready var camera_pivot: Node3D = $CameraPivot
 @onready var camera: Camera3D = $CameraPivot/Camera3D
 @onready var visual: Node3D = $Visual
+@onready var animation_player: AnimationPlayer = $Visual/AnimationPlayer
 
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 
@@ -26,9 +30,12 @@ var _ghost_target := Vector3.ZERO
 var _target_material := StandardMaterial3D.new()
 var _grid := BUILDING_SIZE
 
+var _current_anim := ""
+
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_setup_ghost()
+	_play_anim(STATE_IDLE)
 
 func _setup_ghost() -> void:
 	_ghost = MeshInstance3D.new()
@@ -43,6 +50,16 @@ func _setup_ghost() -> void:
 	_ghost.material_override = _target_material
 	_ghost.visible = false
 	add_child(_ghost)
+
+func _play_anim(anim_name: String) -> void:
+	if _current_anim == anim_name:
+		return
+	_current_anim = anim_name
+	if not animation_player or not animation_player.has_animation(anim_name):
+		return
+	var anim := animation_player.get_animation(anim_name)
+	anim.loop_mode = Animation.LOOP_LINEAR
+	animation_player.play(anim_name)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if build_mode:
@@ -72,6 +89,7 @@ func _physics_process(delta: float) -> void:
 	_handle_movement(delta)
 	move_and_slide()
 	_face_movement_direction()
+	_update_animation()
 	if build_mode:
 		_update_ghost_target()
 		_apply_ghost()
@@ -105,6 +123,13 @@ func _face_movement_direction() -> void:
 	if flat_velocity.length_squared() > 0.1:
 		visual.rotation.y = lerp_angle(visual.rotation.y, atan2(-velocity.x, -velocity.z), 0.15)
 
+func _update_animation() -> void:
+	var flat_speed := Vector3(velocity.x, 0.0, velocity.z).length()
+	if flat_speed > 0.5:
+		_play_anim(STATE_WALK)
+	else:
+		_play_anim(STATE_IDLE)
+
 func _handle_orientation_keys() -> void:
 	var step := 0.1
 	var rot := visual.rotation.y
@@ -122,7 +147,6 @@ func _toggle_build_mode() -> void:
 		_update_ghost_target()
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	_ghost.visible = false if not build_mode else _ghost.visible
 
 func _update_ghost_target() -> void:
 	var from := camera.global_position
