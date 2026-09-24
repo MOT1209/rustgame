@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Rust Survival 3D</string>
+    <string name="title_activity_main">Rust Survival 3D</string>
+    <string name="package_name">com.rashid.rustgame</string>
+    <string name="custom_url_scheme">com.rashid.rustgame</string>
+</resources>
