@@ -1,6 +1,23 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
+// ---- Phase 1 modular systems (pure, testable, no DOM/THREE) ----
+import { SURVIVAL_CONFIG, SAVE_VERSION, SAVE_KEY } from './core/config.js';
+import { DamageSystem, DamageTypes } from './player/damage.js';
+import { StaminaSystem } from './player/stamina.js';
+import { SurvivalSystem } from './player/survival.js';
+import { FOOD_DEFS } from './inventory/items.js';
+import { StorageInventory } from './inventory/storage.js';
+import { PHASE1_RECIPES } from './crafting/recipes.js';
+import { NODE_TYPES, getNodeDef, yieldForHit } from './world/resources.js';
+import { WATER_SOURCES, drink as drinkFromSource } from './world/water.js';
+import { WeatherSystem } from './world/weather.js';
+import { DayNight } from './world/day-night.js';
+import { InteractionSystem, InteractKinds } from './interaction/interaction.js';
+import { SaveSystem } from './save/save-system.js';
+import { InputSystem, Actions, keyboardProvider, touchProvider, gamepadProvider } from './input/input.js';
+import { updateSurvivalHud, setPrompt } from './ui/hud.js';
+
 // Rust Survival Engine v2.5: Initializing with Collision Physics...
 
 // ==================== CONFIGURATION ====================
@@ -34,13 +51,14 @@ const state = {
     ],
     gear: { head: null, chest: null, legs: null, feet: null },
     belt: ['building_plan', 'hammer', null, null, null, null],
-    stats: { health: 100, hunger: 100, thirst: 100, radiation: 0 },
+    stats: { health: 100, hunger: 100, thirst: 100, radiation: 0, stamina: 100, temperature: 100, bleeding: 0 },
+    day: 1,
     dead: false,
     deathCount: 0,
     reviveCount: 0,
     buildMode: false,
     viewMode: 'first',
-    controls: { forward: false, backward: false, left: false, right: false, jump: false, canJump: false, crouch: false },
+    controls: { forward: false, backward: false, left: false, right: false, jump: false, canJump: false, crouch: false, sprint: false },
     selectedBeltSlot: 0,
     selectedCategory: 'common',
     selectedItem: null,
@@ -123,8 +141,12 @@ const ITEMS_DATA = {
     'bandage': { name: 'Bandage', category: 'medical', icon: 'fa-band-aid', color: '#e57373', rarity: 'common', recipe: { cloth: 2 }, desc: 'Stops bleeding immediately.' },
     'syringe': { name: 'Medical Syringe', category: 'medical', icon: 'fa-syringe', color: '#ef5350', rarity: 'rare', recipe: { iron: 20, scrap: 5, cloth: 10 }, desc: 'Instant adrenaline-boosted recovery.' },
     'wooden_door': { name: 'Wooden Door', category: 'construction', icon: 'fa-door-closed', color: '#5d4037', rarity: 'common', recipe: { wood: 300 }, desc: 'Fits into doorways.' },
-    'codelock': { name: 'Code Lock', category: 'items', icon: 'fa-calculator', color: '#78909c', rarity: 'rare', recipe: { frag: 100 }, desc: 'Secure your doors with a 4-digit code.' }
+    'codelock': { name: 'Code Lock', category: 'items', icon: 'fa-calculator', color: '#78909c', rarity: 'rare', recipe: { frag: 100 }, desc: 'Secure your doors with a 4-digit code.' },
+    'wooden_box': { name: 'Wooden Storage Box', category: 'survival', icon: 'fa-box-archive', color: '#a1887f', rarity: 'common', recipe: { wood: 150 }, desc: 'Placeable container. Stores 12 stacks. Press E near ground to place.' }
 };
+
+// Phase 1: merge food/consumable defs (spoil-ready model) into the item registry.
+Object.assign(ITEMS_DATA, FOOD_DEFS);
 
 // ==================== GLOBAL HELPERS ====================
 function showNotification(msg, color = '#4caf50') {
@@ -213,10 +235,57 @@ function getItemCount(id) {
 }
 
 function addItem(id, count) {
+    // Phase 1 validation (§28): unknown items and bad counts never crash or corrupt.
+    if (!id || typeof id !== 'string' || !ITEMS_DATA[id]) {
+        console.warn('[inventory] rejected unknown item:', id);
+        return 0;
+    }
+    if (typeof count !== 'number' || !isFinite(count) || count <= 0) return 0;
+    const whole = Math.floor(count);
     let item = state.inventory.find(i => i.id === id);
-    if (item) item.count += count;
-    else state.inventory.push({ id, count });
+    if (item) item.count += whole;
+    else state.inventory.push({ id, count: whole });
     updateHUD();
+    return whole;
+}
+
+// Phase 1: clamped removal — never lets counts go negative. Returns removed.
+function removeItem(id, count) {
+    if (!id || typeof count !== 'number' || !isFinite(count) || count <= 0) return 0;
+    const item = state.inventory.find(i => i.id === id);
+    if (!item) return 0;
+    const actual = Math.min(item.count, Math.floor(count));
+    item.count -= actual;
+    if (item.count <= 0) state.inventory.splice(state.inventory.indexOf(item), 1);
+    updateHUD();
+    return actual;
+}
+
+// Phase 1: all-or-nothing consume. Returns true only when fully consumed.
+function consumeItem(id, count) {
+    if (getItemCount(id) < count) return false;
+    removeItem(id, count);
+    return true;
+}
+
+// Phase 1: use a consumable (food/medical) from the inventory.
+function useConsumable(id) {
+    const def = FOOD_DEFS[id] || ITEMS_DATA[id];
+    if (!def || getItemCount(id) <= 0) return false;
+    if (!consumeItem(id, 1)) return false;
+    if (def.hungerRestore) state.stats.hunger = Math.min(100, state.stats.hunger + def.hungerRestore);
+    if (def.thirstRestore) state.stats.thirst = Math.min(100, state.stats.thirst + def.thirstRestore);
+    if (def.healthRestore) {
+        if (def.healthRestore > 0) DamageSystem.heal(state.stats, def.healthRestore);
+        else DamageSystem.applyDamage(state.stats, -def.healthRestore, DamageTypes.GENERIC);
+    }
+    if ((id === 'bandage' || (ITEMS_DATA[id] && ITEMS_DATA[id].category === 'medical')) && SURVIVAL_CONFIG.bandageStopsBleeding) {
+        state.stats.bleeding = 0;
+    }
+    showNotification(`Used ${def.name}`, '#2ecc71');
+    SoundFX.ui_click();
+    updateHUD();
+    return true;
 }
 
 function updateHUD() {
@@ -230,10 +299,8 @@ function updateHUD() {
 }
 
 function updateHUDSimulation() {
-    document.getElementById('health-fill').style.width = `${state.stats.health}%`;
-    document.getElementById('hunger-fill').style.width = `${state.stats.hunger}%`;
-    document.getElementById('thirst-fill').style.width = `${state.stats.thirst}%`;
-    document.getElementById('rad-fill').style.width = `${state.stats.radiation}%`;
+    // Phase 1: throttled HUD writer (bars + clock), DOM touched only on change.
+    updateSurvivalHud(state.stats, { day: state.day || 1, time: state.time }, SURVIVAL_CONFIG.dayLength);
 
     const overlay = document.getElementById('rad-overlay');
     if (overlay) overlay.style.opacity = state.stats.radiation / 200;
@@ -279,7 +346,9 @@ function createPlayer(scene) {
 
 // ==================== SYSTEMS ====================
 class NPC {
-    constructor(scene, type, position) {
+    constructor(scene, type, position, world) {
+        this.scene = scene;
+        this.world = world || null; // { collisionObjects, npcs } — fixes scope crash in die()
         this.type = type;
         this.mesh = new THREE.Group();
         const color = type === 'wolf' ? 0x5d4037 : (type === 'bear' ? 0x3e2723 : 0x01579b);
@@ -317,19 +386,22 @@ class NPC {
         const loot = lootMap[this.type] || { cloth: 5 };
         Object.entries(loot).forEach(([id, count]) => addItem(id, count));
         showNotification(`${this.type} killed! +${Object.values(loot).reduce((a,b)=>a+b,0)} resources`, '#e74c3c');
-        // Remove from collision
-        const idx = collisionObjects.indexOf(this.mesh);
-        if (idx !== -1) collisionObjects.splice(idx, 1);
+        // Remove from collision (Phase 1: world refs injected via constructor)
+        const colArr = (this.world && this.world.collisionObjects) || [];
+        const idx = colArr.indexOf(this.mesh);
+        if (idx !== -1) colArr.splice(idx, 1);
         // Fade out and remove
+        const self = this;
         const interval = setInterval(() => {
-            this.mesh.scale.multiplyScalar(0.9);
-            this.mesh.position.y -= 0.05;
-            if (this.mesh.scale.x < 0.1) {
+            self.mesh.scale.multiplyScalar(0.9);
+            self.mesh.position.y -= 0.05;
+            if (self.mesh.scale.x < 0.1) {
                 clearInterval(interval);
-                scene.remove(this.mesh);
+                if (self.scene) self.scene.remove(self.mesh);
                 // Remove from npcs array
-                const npcIdx = npcs.indexOf(this);
-                if (npcIdx !== -1) npcs.splice(npcIdx, 1);
+                const arr = (self.world && self.world.npcs) || [];
+                const npcIdx = arr.indexOf(self);
+                if (npcIdx !== -1) arr.splice(npcIdx, 1);
             }
         }, 30);
     }
@@ -346,7 +418,13 @@ class NPC {
                 this.mesh.position.addScaledVector(dir, (this.type === 'bear' ? 3 : 5) * delta);
             }
             if (dist < attackRange && performance.now() - this.lastAttack > (this.type === 'scientist' ? 800 : 1200)) {
-                state.stats.health -= (this.type === 'bear' ? 20 : (this.type === 'scientist' ? 8 : 12));
+                // Phase 1: centralized damage + bleeding from animal attacks.
+                const dmg = (this.type === 'bear' ? 20 : (this.type === 'scientist' ? 8 : 12));
+                DamageSystem.applyDamage(state.stats, dmg, DamageTypes.ANIMAL);
+                if (this.type !== 'scientist' && Math.random() < 0.25) {
+                    state.stats.bleeding = 1;
+                    showNotification('🩸 You are bleeding! Use a bandage.', '#e74c3c');
+                }
                 updateHUD(); this.lastAttack = performance.now();
                 SoundFX.hit();
             }
@@ -366,7 +444,7 @@ function createMonument(scene, x, z) {
     radZones.push({ x, z, r: CONFIG.RAD_ZONE_RADIUS });
     const loot = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1, 1.2), new THREE.MeshStandardMaterial({ color: 0xffa000 }));
     loot.position.set(x + 2, getTerrainHeight(x + 2, z) + 0.5, z);
-    loot.userData = { type: 'crate', health: 1 };
+    loot.userData = { type: 'crate', health: 999, radius: 0.8 }; // Phase 1: looted with E, not hits
     scene.add(loot);
 }
 
@@ -643,6 +721,7 @@ try {
             // Build Sound/VFX
             screenFlash('rgba(255,255,255,0.1)');
             SoundFX.build();
+            try { saveGame(); } catch (_) {} // Phase 1: persist after major events
         }
     }
 
@@ -782,7 +861,7 @@ try {
         }
 
         tree.position.set(x, y, z);
-        tree.userData = { type: 'tree', health: 4, radius: 0.5 };
+        tree.userData = { type: 'tree', health: (getNodeDef('tree') || {}).health || 5, radius: 0.5 };
         scene.add(tree);
         interactables.push(tree);
         collisionObjects.push(tree);
@@ -809,7 +888,7 @@ try {
         rock.scale.set(scale, scale * 0.8, scale);
         rock.rotation.set(Math.random(), Math.random(), Math.random());
         rock.castShadow = true;
-        rock.userData = { type: isSulfur ? 'sulfur' : (isIron ? 'iron' : 'rock'), health: 5, radius: scale };
+        rock.userData = { type: isSulfur ? 'sulfur' : (isIron ? 'iron' : 'rock'), health: (getNodeDef(isSulfur ? 'sulfur' : (isIron ? 'iron' : 'rock')) || {}).health || 6, radius: scale };
         scene.add(rock);
         interactables.push(rock);
         collisionObjects.push(rock);
@@ -824,10 +903,442 @@ try {
         const barrel = new THREE.Mesh(barrelGeo, barrelMat);
         barrel.position.set(x, getTerrainHeight(x, z) + 0.6, z);
         barrel.castShadow = true;
-        barrel.userData = { type: 'barrel', health: 3, radius: 0.5 };
+        barrel.userData = { type: 'barrel', health: (getNodeDef('barrel') || {}).health || 3, radius: 0.5 };
         scene.add(barrel);
         interactables.push(barrel);
         collisionObjects.push(barrel);
+    }
+
+    // ==================== PHASE 1: SURVIVAL SYSTEMS & WORLD ====================
+    CONFIG.HEMP_COUNT = CONFIG.HEMP_COUNT || 25;
+    CONFIG.BERRY_COUNT = CONFIG.BERRY_COUNT || 20;
+
+    const weather = new WeatherSystem();
+    const interaction = new InteractionSystem();
+    const inputSys = new InputSystem();
+    try { inputSys.addProvider(gamepadProvider(0)); } catch (_) {}
+    const storageBoxes = [];  // { id, mesh, inv: StorageInventory, pos }
+    const campfires = [];     // { mesh, light, pos }
+    const waterBodies = [];   // { mesh, source: {type, level}, pos, radius }
+    let storageSeq = 0;
+    let currentInteractTarget = null; // set by the E prompter
+    let sprintActive = false;
+
+    function surfaceY(x, z, lift = 0) {
+        return getTerrainHeight(x, z) + lift;
+    }
+
+    // ---- Hemp (cloth) & Berry bushes (food) ----
+    const hempMat = new THREE.MeshStandardMaterial({ color: 0x33691e, roughness: 1.0 });
+    const stemMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 1.0 });
+    for (let i = 0; i < CONFIG.HEMP_COUNT; i++) {
+        const x = (Math.random() - 0.5) * (CONFIG.WORLD_SIZE - 60);
+        const z = (Math.random() - 0.5) * (CONFIG.WORLD_SIZE - 60);
+        const hemp = new THREE.Group();
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.2, 6), stemMat);
+        stem.position.y = 0.6; hemp.add(stem);
+        const top = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55, 0), hempMat);
+        top.position.y = 1.3; top.castShadow = true; hemp.add(top);
+        hemp.position.set(x, surfaceY(x, z), z);
+        hemp.userData = { type: 'hemp', health: (getNodeDef('hemp') || {}).health || 2, radius: 0.5 };
+        scene.add(hemp); interactables.push(hemp); collisionObjects.push(hemp);
+    }
+    const berryLeafMat = new THREE.MeshStandardMaterial({ color: 0x1b5e20, roughness: 1.0 });
+    const berryMat = new THREE.MeshStandardMaterial({ color: 0xd81b60, roughness: 0.6 });
+    for (let i = 0; i < CONFIG.BERRY_COUNT; i++) {
+        const x = (Math.random() - 0.5) * (CONFIG.WORLD_SIZE - 60);
+        const z = (Math.random() - 0.5) * (CONFIG.WORLD_SIZE - 60);
+        const bush = new THREE.Group();
+        const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 0), berryLeafMat);
+        leaves.position.y = 0.5; leaves.castShadow = true; bush.add(leaves);
+        for (let b = 0; b < 4; b++) {
+            const berry = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), berryMat);
+            const a = (b / 4) * Math.PI * 2;
+            berry.position.set(Math.cos(a) * 0.55, 0.5 + (Math.random() - 0.5) * 0.4, Math.sin(a) * 0.55);
+            bush.add(berry);
+        }
+        bush.position.set(x, surfaceY(x, z), z);
+        bush.userData = { type: 'berry_bush', health: (getNodeDef('berry_bush') || {}).health || 2, radius: 0.6 };
+        scene.add(bush); interactables.push(bush); collisionObjects.push(bush);
+    }
+
+    // ---- Lake (infinite) + camp water container (finite) ----
+    function spawnWaterBody(kind, x, z, radius) {
+        const def = WATER_SOURCES[kind] || WATER_SOURCES.lake;
+        let mesh;
+        if (kind === 'lake') {
+            mesh = new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 28),
+                new THREE.MeshStandardMaterial({ color: 0x0288d1, transparent: true, opacity: 0.8, roughness: 0.2 })
+            );
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.set(x, surfaceY(x, z, 0.15), z);
+        } else {
+            mesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.6, 0.6, 1.1, 14),
+                new THREE.MeshStandardMaterial({ color: 0x78909c, metalness: 0.5, roughness: 0.5 })
+            );
+            mesh.position.set(x, surfaceY(x, z, 0.55), z);
+            mesh.castShadow = true;
+        }
+        const entry = { mesh, source: { type: kind, level: def.capacity || 0 }, pos: { x, z }, radius, kind };
+        mesh.userData = { type: 'water', sourceKind: kind, radius };
+        scene.add(mesh);
+        if (kind !== 'lake') collisionObjects.push(mesh);
+        waterBodies.push(entry);
+        return entry;
+    }
+    spawnWaterBody('lake', 70, 60, 7);
+    spawnWaterBody('container', 4, 3, 3);
+
+    // ---- Storage boxes ----
+    const boxWoodMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.9 });
+    const boxDarkMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.9 });
+    function spawnStorageBox(x, z, savedInv) {
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.8), boxWoodMat);
+        body.position.y = 0.4; body.castShadow = true; g.add(body);
+        const lid = new THREE.Mesh(new THREE.BoxGeometry(1.24, 0.12, 0.84), boxDarkMat);
+        lid.position.y = 0.86; g.add(lid);
+        const y = surfaceY(x, z);
+        g.position.set(x, y, z);
+        const id = 'box_' + (++storageSeq);
+        g.userData = { type: 'storage', boxId: id, radius: 0.9 };
+        const entry = { id, mesh: g, inv: StorageInventory.fromJSON(savedInv || [], ITEMS_DATA), pos: { x, y, z } };
+        scene.add(g); interactables.push(g); collisionObjects.push(g);
+        storageBoxes.push(entry);
+        return entry;
+    }
+    spawnStorageBox(-4, 3, null); // camp box
+
+    // ---- Campfires (warmth + cooking) ----
+    const stoneMat2 = new THREE.MeshStandardMaterial({ color: 0x757575, roughness: 1 });
+    const logMat = new THREE.MeshStandardMaterial({ color: 0x4e342e, roughness: 1 });
+    const flameMat = new THREE.MeshStandardMaterial({ color: 0xff9800, emissive: 0xff6d00, emissiveIntensity: 2 });
+    function placeCampfire(x, z) {
+        const g = new THREE.Group();
+        for (let s = 0; s < 6; s++) {
+            const a = (s / 6) * Math.PI * 2;
+            const stone = new THREE.Mesh(new THREE.DodecahedronGeometry(0.22, 0), stoneMat2);
+            stone.position.set(Math.cos(a) * 0.8, 0.15, Math.sin(a) * 0.8);
+            g.add(stone);
+        }
+        for (let l = 0; l < 2; l++) {
+            const log = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.1, 8), logMat);
+            log.rotation.z = Math.PI / 2; log.rotation.y = l * Math.PI / 2;
+            log.position.y = 0.2; g.add(log);
+        }
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.7, 8), flameMat);
+        flame.position.y = 0.6; flame.name = 'flame'; g.add(flame);
+        const light = new THREE.PointLight(0xff8c3a, 12, 14, 1.6);
+        light.position.y = 1.0; g.add(light);
+        g.position.set(x, surfaceY(x, z), z);
+        g.userData = { type: 'campfire', radius: 1.0 };
+        scene.add(g); interactables.push(g); collisionObjects.push(g);
+        campfires.push({ mesh: g, light, pos: { x, z } });
+        return g;
+    }
+
+    function nearestCampfireDist(x, z) {
+        let best = Infinity;
+        for (const c of campfires) {
+            const d = Math.sqrt((x - c.pos.x) ** 2 + (z - c.pos.z) ** 2);
+            if (d < best) best = d;
+        }
+        return best;
+    }
+
+    // ==================== PHASE 1: UNIFIED INTERACTION (E) ====================
+    function findBoxById(boxId) {
+        return storageBoxes.find(b => b.id === boxId) || null;
+    }
+    function findWaterByMesh(mesh) {
+        return waterBodies.find(w => w.mesh === mesh) || null;
+    }
+
+    interaction.register(InteractKinds.STORAGE, {
+        priority: 30,
+        canInteract: (c) => !!(c && c.kind === 'storage' && c.root && findBoxById(c.root.userData.boxId)),
+        label: () => 'E — Open storage box',
+        act: (c) => { openStoragePanel(c.root.userData.boxId); return true; },
+    });
+    interaction.register(InteractKinds.DRINK, {
+        priority: 25,
+        canInteract: (c) => !!(c && c.kind === 'drink' && c.root && findWaterByMesh(c.root)),
+        label: (c) => {
+            const w = findWaterByMesh(c.root);
+            const name = (w && w.kind === 'container') ? 'Water container' : 'Lake';
+            return `E — Drink (${name})`;
+        },
+        act: (c) => {
+            const w = findWaterByMesh(c.root);
+            if (!w) return false;
+            const r = drinkFromSource(state.stats, w.source, SURVIVAL_CONFIG.maxThirst);
+            if (r.empty) { showNotification('Container is empty', '#e74c3c'); return true; }
+            showNotification(`Drank water (+${Math.round(r.drank)} thirst)`, '#4fc3f7');
+            SoundFX.ui_click();
+            updateHUD();
+            return true;
+        },
+    });
+    interaction.register(InteractKinds.LOOT, {
+        priority: 20,
+        canInteract: (c) => !!(c && c.kind === 'loot' && c.root),
+        label: () => 'E — Loot crate',
+        act: (c) => {
+            const root = c.root;
+            const gained = [];
+            const scrap = 4 + Math.floor(Math.random() * 5);
+            addItem('scrap', scrap); gained.push(`${scrap} scrap`);
+            if (Math.random() < 0.45) { addItem('canned_food', 1); gained.push('canned food'); }
+            if (Math.random() < 0.3) { addItem('cloth', 3); gained.push('3 cloth'); }
+            if (Math.random() < 0.15) { addItem('water', 1); gained.push('water'); }
+            showNotification(`Looted: ${gained.join(', ')}`, '#f39c12');
+            SoundFX.harvest();
+            scene.remove(root);
+            for (const arr of [interactables, collisionObjects]) {
+                const i = arr.indexOf(root);
+                if (i !== -1) arr.splice(i, 1);
+            }
+            scheduleRespawn(root, root.position, 'crate', null, 200);
+            updateHUD();
+            return true;
+        },
+    });
+    interaction.register(InteractKinds.DOOR, {
+        priority: 15,
+        canInteract: (c) => !!(c && c.kind === 'door' && c.root),
+        label: (c) => (c.root.userData.isOpen ? 'E — Close door' : 'E — Open door'),
+        act: (c) => {
+            const root = c.root;
+            root.userData.isOpen = !root.userData.isOpen;
+            root.rotation.y = root.userData.isOpen ? Math.PI / 2 : 0;
+            SoundFX.door();
+            return true;
+        },
+    });
+    interaction.register(InteractKinds.USE, {
+        priority: 12,
+        canInteract: (c) => !!(c && (c.kind === 'cook' || c.kind === 'place-box' || c.kind === 'place-campfire')),
+        label: (c) => {
+            if (c.kind === 'cook') return getItemCount('raw_meat') > 0 ? 'E — Cook raw meat' : 'Campfire (need raw meat)';
+            if (c.kind === 'place-box') return 'E — Place storage box';
+            return 'E — Place campfire';
+        },
+        act: (c) => {
+            if (c.kind === 'cook') {
+                if (!consumeItem('raw_meat', 1)) { showNotification('Need raw meat', '#e74c3c'); return true; }
+                addItem('cooked_meat', 1);
+                state.stats.temperature = Math.min(100, state.stats.temperature + 5);
+                showNotification('Cooked meat (+5 warmth)', '#ff9800');
+                SoundFX.build();
+                updateHUD();
+                return true;
+            }
+            if (c.kind === 'place-box') {
+                if (!consumeItem('wooden_box', 1)) return true;
+                spawnStorageBox(c.point.x, c.point.z, null);
+                showNotification('Storage box placed', '#2ecc71');
+                SoundFX.build();
+                updateHUD();
+                return true;
+            }
+            if (c.kind === 'place-campfire') {
+                if (!consumeItem('campfire', 1)) return true;
+                placeCampfire(c.point.x, c.point.z);
+                showNotification('Campfire placed', '#ff9800');
+                SoundFX.build();
+                updateHUD();
+                return true;
+            }
+            return false;
+        },
+    });
+
+    function doInteract(target) {
+        try {
+            interaction.interact(target);
+        } catch (err) {
+            console.error('[interact]', err);
+        }
+    }
+
+    // E key: capture phase so contextual interaction wins over inventory toggle.
+    window.addEventListener('keydown', (e) => {
+        if (e.code !== 'KeyE' || e.repeat) return;
+        const ae = document.activeElement;
+        if (ae && ae.tagName === 'INPUT') return;
+        if (storagePanelOpen) {
+            closeStoragePanel();
+            e.preventDefault(); e.stopPropagation();
+            return;
+        }
+        if (currentInteractTarget) {
+            e.preventDefault(); e.stopPropagation();
+            doInteract(currentInteractTarget);
+        }
+    }, true);
+
+    const _promptRay = new THREE.Raycaster();
+    function refreshInteractPrompt() {
+        currentInteractTarget = null;
+        if (state.dead) { setPrompt(null); return; }
+        if (typeof pointerControls !== 'undefined' && !pointerControls.isLocked && isTouchDevice === false) {
+            // Only prompt while playing (pointer locked) on desktop.
+            if (document.getElementById('inventory').style.display === 'flex') { setPrompt(null); return; }
+        }
+        _promptRay.setFromCamera(new THREE.Vector2(0, 0), camera);
+        const hits = _promptRay.intersectObjects([...interactables, ...builtStructures], true);
+        if (hits.length > 0 && hits[0].distance < CONFIG.INTERACT_DISTANCE) {
+            let root = hits[0].object;
+            while (root.parent && root.parent !== scene) root = root.parent;
+            const ud = root.userData || {};
+            let kind = null;
+            if (ud.type === 'storage') kind = 'storage';
+            else if (ud.type === 'water') kind = 'drink';
+            else if (ud.type === 'crate') kind = 'loot';
+            else if (ud.type === 'door') kind = 'door';
+            else if (ud.type === 'campfire') {
+                const d = Math.sqrt((camera.position.x - root.position.x) ** 2 + (camera.position.z - root.position.z) ** 2);
+                if (d < 3.5) kind = 'cook';
+            }
+            if (kind) {
+                const target = { kind, root };
+                const found = interaction.getInteractable(target);
+                if (found) {
+                    currentInteractTarget = target;
+                    setPrompt(found.label);
+                    return;
+                }
+            }
+        }
+        // Ground placement: storage box / campfire from inventory.
+        const gHits = _promptRay.intersectObject(ground);
+        if (gHits.length > 0 && gHits[0].distance < 4) {
+            if (getItemCount('wooden_box') > 0) {
+                currentInteractTarget = { kind: 'place-box', point: gHits[0].point };
+                setPrompt('E — Place storage box');
+                return;
+            }
+            if (getItemCount('campfire') > 0) {
+                currentInteractTarget = { kind: 'place-campfire', point: gHits[0].point };
+                setPrompt('E — Place campfire');
+                return;
+            }
+        }
+        setPrompt(null);
+    }
+    setInterval(refreshInteractPrompt, 150); // throttled: no per-frame DOM/raycast cost
+
+    // ==================== PHASE 1: STORAGE PANEL ====================
+    let storagePanel = null;
+    let storagePanelOpen = false;
+    let openBoxId = null;
+
+    function buildStoragePanel() {
+        if (storagePanel) return storagePanel;
+        const p = document.createElement('div');
+        p.id = 'storage-panel';
+        p.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(560px,92vw);background:rgba(12,14,18,0.96);border:1px solid #444;border-radius:10px;z-index:1500;display:none;color:#eee;font-family:inherit;';
+        p.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #333;">
+                <b>📦 Storage Box</b><span style="font-size:0.75rem;opacity:0.6;">click: move 10 · right-click: move all · [E] close</span>
+                <button id="storage-close" style="background:#c0392b;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;">✕</button>
+            </div>
+            <div style="display:flex;gap:10px;padding:12px 14px;">
+                <div style="flex:1;"><div style="opacity:0.7;font-size:0.8rem;margin-bottom:6px;">🎒 YOU</div><div id="storage-player-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;min-height:120px;"></div></div>
+                <div style="flex:1;"><div style="opacity:0.7;font-size:0.8rem;margin-bottom:6px;">📦 BOX</div><div id="storage-box-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;min-height:120px;"></div></div>
+            </div>`;
+        document.body.appendChild(p);
+        p.querySelector('#storage-close').onclick = () => closeStoragePanel();
+        storagePanel = p;
+        return p;
+    }
+
+    function storageSlotEl(itemId, count, tip) {
+        const d = document.createElement('div');
+        const def = ITEMS_DATA[itemId] || { icon: 'fa-cube', color: '#fff', name: itemId };
+        d.style.cssText = 'position:relative;background:#1c2128;border:1px solid #3a434e;border-radius:6px;padding:10px 4px;text-align:center;cursor:pointer;';
+        d.innerHTML = `<i class="fas ${def.icon}" style="color:${def.color};font-size:1.2rem;"></i><span style="position:absolute;bottom:2px;right:4px;font-size:0.65rem;font-weight:900;">${count}</span>`;
+        d.title = `${def.name || itemId} — ${tip}`;
+        return d;
+    }
+
+    function renderStoragePanel() {
+        const box = findBoxById(openBoxId);
+        if (!box) { closeStoragePanel(); return; }
+        buildStoragePanel();
+        const pg = storagePanel.querySelector('#storage-player-grid');
+        const bg = storagePanel.querySelector('#storage-box-grid');
+        pg.innerHTML = ''; bg.innerHTML = '';
+        for (const it of state.inventory) {
+            if (it.count <= 0) continue;
+            const el = storageSlotEl(it.id, it.count, 'to box');
+            el.onclick = () => depositToBox(box, it.id, 10);
+            el.oncontextmenu = (e) => { e.preventDefault(); depositToBox(box, it.id, Infinity); };
+            pg.appendChild(el);
+        }
+        if (!state.inventory.length) pg.innerHTML = '<span style="opacity:0.4;font-size:0.8rem;">empty</span>';
+        for (const it of box.inv.items) {
+            const el = storageSlotEl(it.id, it.count, 'to you');
+            el.onclick = () => withdrawFromBox(box, it.id, 10);
+            el.oncontextmenu = (e) => { e.preventDefault(); withdrawFromBox(box, it.id, Infinity); };
+            bg.appendChild(el);
+        }
+        if (!box.inv.items.length) bg.innerHTML = '<span style="opacity:0.4;font-size:0.8rem;">empty</span>';
+    }
+
+    function depositToBox(box, id, amount) {
+        if (!box) return;
+        const have = getItemCount(id);
+        if (have <= 0) return;
+        if (box.inv.count(id) <= 0 && box.inv.items.length >= 12) {
+            showNotification('Box is full (12 stacks)', '#e74c3c');
+            return;
+        }
+        const want = (amount === Infinity) ? have : Math.min(have, amount);
+        const added = box.inv.add(id, want);
+        if (added > 0) {
+            removeItem(id, added);
+            SoundFX.ui_click();
+            renderStoragePanel();
+            updateHUD();
+        }
+    }
+
+    function withdrawFromBox(box, id, amount) {
+        if (!box) return;
+        const have = box.inv.count(id);
+        if (have <= 0) return;
+        const want = (amount === Infinity) ? have : Math.min(have, amount);
+        const removed = box.inv.remove(id, want);
+        if (removed > 0) {
+            addItem(id, removed);
+            SoundFX.ui_click();
+            renderStoragePanel();
+            updateHUD();
+        }
+    }
+
+    function openStoragePanel(boxId) {
+        const box = findBoxById(boxId);
+        if (!box) return;
+        openBoxId = boxId;
+        buildStoragePanel();
+        renderStoragePanel();
+        storagePanel.style.display = 'block';
+        storagePanelOpen = true;
+        try { pointerControls.unlock(); } catch (_) {}
+    }
+
+    function closeStoragePanel() {
+        openBoxId = null;
+        storagePanelOpen = false;
+        if (storagePanel) storagePanel.style.display = 'none';
+        try {
+            const inv = document.getElementById('inventory');
+            if (!isTouchDevice && (!inv || inv.style.display !== 'flex')) pointerControls.lock();
+        } catch (_) {}
     }
 
     // Monuments & Rad Zones
@@ -839,7 +1350,7 @@ try {
         const x = (Math.random() - 0.5) * CONFIG.WORLD_SIZE;
         const z = (Math.random() - 0.5) * CONFIG.WORLD_SIZE;
         const type = Math.random() > 0.3 ? 'wolf' : 'bear';
-        const npc = new NPC(scene, type, new THREE.Vector3(x, getTerrainHeight(x, z), z));
+        const npc = new NPC(scene, type, new THREE.Vector3(x, getTerrainHeight(x, z), z), { collisionObjects, npcs });
         npcs.push(npc);
         collisionObjects.push(npc.mesh);
     }
@@ -850,8 +1361,12 @@ try {
     const respawnQueue = [];
     const RESPAWN_DELAY = 30000; // 30 seconds
 
-    function scheduleRespawn(obj, pos, type, worldData) {
-        const data = { pos: { x: pos.x, y: pos.y, z: pos.z }, type, worldData, time: Date.now() };
+    function scheduleRespawn(obj, pos, type, worldData, delaySec) {
+        // Phase 1: per-node respawn time from config, persisted for save/load.
+        const def = (typeof getNodeDef === 'function') ? getNodeDef(type) : null;
+        const delay = (typeof delaySec === 'number' && delaySec > 0) ? delaySec
+            : (def && def.respawnTime) || 30;
+        const data = { pos: { x: pos.x, y: pos.y, z: pos.z }, type, worldData, time: Date.now(), delay: delay * 1000 };
         respawnQueue.push(data);
     }
 
@@ -859,7 +1374,7 @@ try {
         const now = Date.now();
         for (let i = respawnQueue.length - 1; i >= 0; i--) {
             const r = respawnQueue[i];
-            if (now - r.time >= RESPAWN_DELAY) {
+            if (now - r.time >= (r.delay || RESPAWN_DELAY)) {
                 respawnObject(r);
                 respawnQueue.splice(i, 1);
             }
@@ -888,7 +1403,7 @@ try {
                     cluster.castShadow = true; tree.add(cluster);
                 }
                 tree.position.set(pos.x, y, pos.z);
-                tree.userData = { type: 'tree', health: 4, radius: 0.5 };
+                tree.userData = { type: 'tree', health: (getNodeDef('tree') || {}).health || 5, radius: 0.5 };
                 obj = tree;
                 break;
             }
@@ -900,7 +1415,7 @@ try {
                 obj.scale.set(scale, scale * 0.8, scale);
                 obj.rotation.set(Math.random(), Math.random(), Math.random());
                 obj.castShadow = true;
-                obj.userData = { type: 'rock', health: 5, radius: scale };
+                obj.userData = { type: 'rock', health: (getNodeDef('rock') || {}).health || 6, radius: scale };
                 break;
             }
             case 'iron': {
@@ -911,7 +1426,7 @@ try {
                 obj.scale.set(s, s * 0.8, s);
                 obj.rotation.set(Math.random(), Math.random(), Math.random());
                 obj.castShadow = true;
-                obj.userData = { type: 'iron', health: 5, radius: s };
+                obj.userData = { type: 'iron', health: (getNodeDef('iron') || {}).health || 6, radius: s };
                 break;
             }
             case 'sulfur': {
@@ -922,7 +1437,7 @@ try {
                 obj.scale.set(s2, s2 * 0.8, s2);
                 obj.rotation.set(Math.random(), Math.random(), Math.random());
                 obj.castShadow = true;
-                obj.userData = { type: 'sulfur', health: 5, radius: s2 };
+                obj.userData = { type: 'sulfur', health: (getNodeDef('sulfur') || {}).health || 6, radius: s2 };
                 break;
             }
             case 'barrel': {
@@ -930,7 +1445,41 @@ try {
                 obj = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.2, 12), barrelMat);
                 obj.position.set(pos.x, y + 0.6, pos.z);
                 obj.castShadow = true;
-                obj.userData = { type: 'barrel', health: 3, radius: 0.5 };
+                obj.userData = { type: 'barrel', health: (getNodeDef('barrel') || {}).health || 3, radius: 0.5 };
+                break;
+            }
+            case 'hemp': {
+                const hg = new THREE.Group();
+                const hstem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.2, 6), stemMat);
+                hstem.position.y = 0.6; hg.add(hstem);
+                const htop = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55, 0), hempMat);
+                htop.position.y = 1.3; htop.castShadow = true; hg.add(htop);
+                hg.position.set(pos.x, y, pos.z);
+                hg.userData = { type: 'hemp', health: (getNodeDef('hemp') || {}).health || 2, radius: 0.5 };
+                obj = hg;
+                break;
+            }
+            case 'berry_bush': {
+                const bg = new THREE.Group();
+                const bleaves = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 0), berryLeafMat);
+                bleaves.position.y = 0.5; bleaves.castShadow = true; bg.add(bleaves);
+                for (let b = 0; b < 4; b++) {
+                    const bb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), berryMat);
+                    const ba = (b / 4) * Math.PI * 2;
+                    bb.position.set(Math.cos(ba) * 0.55, 0.5, Math.sin(ba) * 0.55);
+                    bg.add(bb);
+                }
+                bg.position.set(pos.x, y, pos.z);
+                bg.userData = { type: 'berry_bush', health: (getNodeDef('berry_bush') || {}).health || 2, radius: 0.6 };
+                obj = bg;
+                break;
+            }
+            case 'crate': {
+                const cmat = new THREE.MeshStandardMaterial({ color: 0xffa000, roughness: 0.7 });
+                obj = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1, 1.2), cmat);
+                obj.position.set(pos.x, y + 0.5, pos.z);
+                obj.castShadow = true;
+                obj.userData = { type: 'crate', health: 999, radius: 0.8 };
                 break;
             }
         }
@@ -1088,11 +1637,16 @@ try {
             obj.position.y += 0.05; setTimeout(() => obj.position.y -= 0.05, 50);
 
             const type = obj.userData.type;
-            if (type === 'tree') addItem('wood', 12);
-            else if (type === 'rock') addItem('stone', 10);
-            else if (type === 'iron') addItem('iron', 8);
-            else if (type === 'sulfur') addItem('sulfur', 8);
-            else if (type === 'barrel') { addItem('scrap', 3); addItem('lgf', 2); }
+            // Phase 1: config-driven yields + tool bonus + stamina cost.
+            const ndef = (typeof getNodeDef === 'function') ? getNodeDef(type) : null;
+            if (ndef) {
+                const tool = state.belt[state.selectedBeltSlot || 0];
+                const yields = yieldForHit(ndef, tool);
+                for (const [rid, rcount] of Object.entries(yields)) addItem(rid, rcount);
+                StaminaSystem.drainGather(state.stats);
+            } else if (type === 'crate') {
+                showNotification('Press E to loot the crate', '#f39c12');
+            }
 
             if (obj.userData.health <= 0) {
                 const pos = obj.position.clone();
@@ -1208,6 +1762,15 @@ try {
                         updateHotbarUI();
                         renderInventoryGrid();
                     };
+                    // Phase 1: double-click food/medical items to use them.
+                    if (data.category === 'food' || data.category === 'medical') {
+                        slot.title = `${data.name} — double-click to use`;
+                        slot.ondblclick = () => {
+                            useConsumable(item.id);
+                            renderInventoryGrid();
+                            renderBelt();
+                        };
+                    }
                 }
             }
             grid.appendChild(slot);
@@ -1216,13 +1779,26 @@ try {
 
     window.updateCraftQty = (val) => { state.craftQty = Math.max(1, state.craftQty + val); if (state.selectedItem) showCraftingDetail(state.selectedItem); };
     window.performCraft = (id) => {
+        // Phase 1 (§28): validate BEFORE deducting — inventory can never go negative.
         const item = ITEMS_DATA[id];
-        for (let [res, amt] of Object.entries(item.recipe)) {
-            const needed = amt * state.craftQty;
-            const invItem = state.inventory.find(i => i.id === res);
-            if (invItem) invItem.count -= needed;
+        if (!item || !item.recipe) return;
+        const qty = Math.max(1, state.craftQty || 1);
+        const missing = [];
+        for (const [res, amt] of Object.entries(item.recipe)) {
+            const needed = amt * qty;
+            if (getItemCount(res) < needed) missing.push(`${needed - getItemCount(res)}× ${ITEMS_DATA[res]?.name || res}`);
         }
-        addItem(id, state.craftQty); updateHUD(); showCraftingDetail(id);
+        if (missing.length > 0) {
+            showNotification(`Missing: ${missing.join(', ')}`, '#e74c3c');
+            return;
+        }
+        for (const [res, amt] of Object.entries(item.recipe)) {
+            removeItem(res, amt * qty);
+        }
+        addItem(id, qty);
+        showNotification(`Crafted: ${item.name}`, '#2ecc71');
+        SoundFX.build();
+        updateHUD(); showCraftingDetail(id);
     };
 
     function renderBelt() {
@@ -1313,14 +1889,27 @@ try {
             updateBlueprintIndicator();
         }
 
+        // Phase 1: sprint + keyboard jump (stamina-driven).
+        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') state.controls.sprint = true;
+        if (e.code === 'Space' && !e.repeat && state.controls.canJump && !state.dead) {
+            velocity.y += CONFIG.JUMP_FORCE;
+            state.controls.canJump = false;
+            StaminaSystem.drainJump(state.stats);
+        }
+
         // Escape to force lock/close everything
         if (e.code === 'Escape') {
             const inv = document.getElementById('inventory');
             const menu = document.getElementById('radial-menu');
             inv.style.display = 'none';
             menu.style.display = 'none';
+            closeStoragePanel();
             pointerControls.lock();
         }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') state.controls.sprint = false;
     });
 
     window.addEventListener('mousedown', (e) => {
@@ -1460,15 +2049,26 @@ try {
         const time = performance.now();
         const delta = Math.min((time - lastTime) / 1000, 0.1);
 
-        // Simulation Update (Hunger, Thirst, Rad)
-        state.time = (state.time + delta) % CONFIG.DAY_LENGTH;
-        const dayProgress = state.time / CONFIG.DAY_LENGTH;
+        // Phase 1: day clock (save-compatible) + weather.
+        const adv = DayNight.advance(state.day || 1, state.time, delta, SURVIVAL_CONFIG.dayLength);
+        if (adv.wrapped) {
+            showNotification(`☀️ Day ${adv.day} — you survived another day`, '#f39c12');
+        }
+        state.day = adv.day;
+        state.time = adv.time;
+        const dayProgress = state.time / SURVIVAL_CONFIG.dayLength;
+
+        if (weather.update(delta)) {
+            showNotification(`${weather.def.icon} ${weather.def.name}`, '#7fb3d5');
+        }
 
         // Day/Night Cycle
         const angle = dayProgress * Math.PI * 2;
+        const wmod = weather.def;
         sun.position.set(Math.cos(angle) * 100, Math.sin(angle) * 100, 20);
-        sun.intensity = Math.max(0, Math.sin(angle) * 1.5);
-        ambientLight.intensity = Math.max(0.1, Math.sin(angle) * 0.4);
+        sun.intensity = Math.max(0, Math.sin(angle) * 1.5) * wmod.lightMod;
+        ambientLight.intensity = Math.max(0.1, Math.sin(angle) * 0.4) * wmod.lightMod;
+        scene.fog.density = 0.005 * wmod.fogMod;
         // Day/Night fog: reuse the existing FogExp2 object, only update color when it changes
         const fogNight = dayProgress > 0.5 && dayProgress < 0.9;
         const fogTarget = fogNight ? 0x050510 : 0x87ceeb;
@@ -1481,21 +2081,35 @@ try {
             if (state.dead) {
                 // ☠️ اللاعب ميت — تجميد كل المحاكاة (شاشة الموت نشطة)
             } else {
-            // Survival Stats logic
-            state.stats.hunger = Math.max(0, state.stats.hunger - 0.05 * delta);
-            state.stats.thirst = Math.max(0, state.stats.thirst - 0.08 * delta);
-
-            // Radiation logic
+            // Phase 1: centralized survival simulation (config-driven, no per-frame allocs).
             let inRad = false;
-            radZones.forEach(z => {
-                const d = new THREE.Vector3(camera.position.x, 0, camera.position.z).distanceTo(new THREE.Vector3(z.x, 0, z.z));
-                if (d < z.r) inRad = true;
-            });
-            if (inRad) state.stats.radiation = Math.min(100, state.stats.radiation + 2 * delta);
-            else state.stats.radiation = Math.max(0, state.stats.radiation - 1 * delta);
+            for (const z of radZones) {
+                const dx = camera.position.x - z.x;
+                const dz = camera.position.z - z.z;
+                if (dx * dx + dz * dz < z.r * z.r) { inRad = true; break; }
+            }
 
-            if (state.stats.hunger <= 0 || state.stats.thirst <= 0 || state.stats.radiation >= 100) {
-                state.stats.health -= 2 * delta;
+            const moving = state.controls.forward || state.controls.backward || state.controls.left || state.controls.right;
+            const stim = StaminaSystem.update(state.stats, delta, {
+                wantSprint: !!state.controls.sprint && moving,
+                freezing: state.stats.temperature <= SURVIVAL_CONFIG.freezingThreshold,
+            });
+            sprintActive = stim.sprinting;
+
+            const surv = SurvivalSystem.tick(state.stats, delta, {
+                sprinting: sprintActive,
+                inRadiation: inRad,
+                isNight: DayNight.isNight(state.time, SURVIVAL_CONFIG.dayLength),
+                isRaining: weather.isRaining,
+                nearFire: nearestCampfireDist(camera.position.x, camera.position.z) < 6,
+            });
+            for (const ev of surv.events) {
+                if (ev.type === 'hunger' && (ev.to === 'hungry' || ev.to === 'starving')) {
+                    showNotification(ev.to === 'hungry' ? '🍖 You feel hungry' : '🍖 You are STARVING!', '#e67e22');
+                }
+                if (ev.type === 'thirst' && (ev.to === 'thirsty' || ev.to === 'dehydrated')) {
+                    showNotification(ev.to === 'thirsty' ? '💧 You feel thirsty' : '💧 You are DEHYDRATED!', '#3498db');
+                }
             }
 
             // Update NPCs
@@ -1507,8 +2121,9 @@ try {
             direction.z = Number(state.controls.forward) - Number(state.controls.backward);
             direction.x = Number(state.controls.right) - Number(state.controls.left);
             if (direction.lengthSq() > 0) direction.normalize();
-            if (state.controls.forward || state.controls.backward) velocity.z -= direction.z * CONFIG.PLAYER_SPEED * delta;
-            if (state.controls.left || state.controls.right) velocity.x -= direction.x * CONFIG.PLAYER_SPEED * delta;
+            const moveSpeed = CONFIG.PLAYER_SPEED * (sprintActive ? 1.55 : 1);
+            if (state.controls.forward || state.controls.backward) velocity.z -= direction.z * moveSpeed * delta;
+            if (state.controls.left || state.controls.right) velocity.x -= direction.x * moveSpeed * delta;
             pointerControls.moveRight(-velocity.x * delta);
             pointerControls.moveForward(-velocity.z * delta);
             const collisionPoint = { x: camera.position.x, z: camera.position.z };
@@ -1516,7 +2131,16 @@ try {
             camera.position.x = collisionPoint.x; camera.position.z = collisionPoint.z;
             camera.position.y += (velocity.y * delta);
             const groundY = getTerrainHeight(camera.position.x, camera.position.z) + 1.6;
-            if (camera.position.y < groundY) { velocity.y = 0; camera.position.y = groundY; state.controls.canJump = true; }
+            if (camera.position.y < groundY) {
+                // Phase 1: centralized fall damage.
+                if (velocity.y < -20) {
+                    const fallDmg = Math.round((-velocity.y - 20) * 5);
+                    DamageSystem.applyDamage(state.stats, fallDmg, DamageTypes.FALL);
+                    showNotification(`💥 Fall damage: ${fallDmg}`, '#e74c3c');
+                    screenFlash('rgba(255,0,0,0.25)');
+                }
+                velocity.y = 0; camera.position.y = groundY; state.controls.canJump = true;
+            }
             if (playerMesh) {
                 playerMesh.position.set(camera.position.x, camera.position.y - 1.6, camera.position.z);
                 const playerRot = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
@@ -1564,41 +2188,59 @@ try {
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // ==================== PERSISTENCE SYSTEM ====================
+    // ==================== PERSISTENCE SYSTEM (Phase 1: versioned + migrating) ====================
     function saveGame() {
-        const saveData = {
-            version: 1.0,
-            timestamp: Date.now(),
-            player: {
-                position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
-                rotation: { y: camera.rotation.y }, // Camera rotation for yaw
-                stats: state.stats,
-                inventory: state.inventory,
-                belt: state.belt
-            },
-            time: state.time,
-            structures: builtStructures.map(s => ({
-                type: s.userData.buildType || 'structure', // Use buildType for structures
-                pos: { x: s.position.x, y: s.position.y, z: s.position.z },
-                rot: s.rotation.y,
-                tier: s.userData.tier,
-                health: s.userData.health,
-                maxHealth: s.userData.maxHealth,
-                isTC: s.userData.type === 'tool_cupboard'
-            }))
-        };
+        // Versioned save (v2); never throws; corruption-safe write.
+        try {
+            const saveData = {
+                saveVersion: SAVE_VERSION,
+                timestamp: Date.now(),
+                player: {
+                    position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+                    rotation: { y: camera.rotation.y }, // Camera rotation for yaw
+                    stats: { ...state.stats },
+                    belt: state.belt,
+                    dead: state.dead
+                },
+                inventory: state.inventory.map(i => ({ id: i.id, count: i.count })),
+                world: {
+                    day: state.day || 1,
+                    weather: weather.toJSON(),
+                    storages: storageBoxes.map(b => ({ id: b.id, x: b.pos.x, y: b.pos.y, z: b.pos.z, inv: b.inv.toJSON() })),
+                    respawns: respawnQueue.map(r => ({
+                        type: r.type,
+                        pos: r.pos,
+                        worldData: r.worldData || null,
+                        remaining: Math.max(1, Math.round(((r.delay || RESPAWN_DELAY) - (Date.now() - r.time)) / 1000))
+                    }))
+                },
+                buildings: {
+                    structures: builtStructures.map(s => ({
+                        type: s.userData.buildType || 'structure', // Use buildType for structures
+                        pos: { x: s.position.x, y: s.position.y, z: s.position.z },
+                        rot: s.rotation.y,
+                        tier: s.userData.tier,
+                        health: s.userData.health,
+                        maxHealth: s.userData.maxHealth,
+                        isTC: s.userData.type === 'tool_cupboard'
+                    })),
+                    toolCupboards: state.building.toolCupboards
+                },
+                time: state.time
+            };
 
-        localStorage.setItem('rust_survival_save', JSON.stringify(saveData));
-        showNotification("Game Saved");
+            if (SaveSystem.write(localStorage, SAVE_KEY, saveData)) showNotification("Game Saved");
+        } catch (e) {
+            console.error('Save failed:', e);
+        }
     }
 
     function loadGame() {
-        const json = localStorage.getItem('rust_survival_save');
-        if (!json) return;
+        // Phase 1: parse + migrate (v1→v2) + validate. Corrupt saves reset safely.
+        const data = SaveSystem.read(localStorage, SAVE_KEY);
+        if (!data) return;
 
         try {
-            const data = JSON.parse(json);
-
             // Restore Player
             camera.position.set(data.player.position.x, data.player.position.y, data.player.position.z);
             if (data.player.rotation && data.player.rotation.y !== undefined) {
@@ -1606,14 +2248,48 @@ try {
             }
             if (playerMesh) playerMesh.position.set(data.player.position.x, data.player.position.y - 1.6, data.player.position.z);
 
-            // Restore State
+            // Restore State (normalized: missing Phase-1 fields get defaults)
+            SurvivalSystem.normalize(data.player.stats);
             state.stats = data.player.stats;
-            state.inventory = data.player.inventory;
-            state.belt = data.player.belt || state.belt;
+            state.inventory = data.inventory;
+            state.belt = (data.player.belt && data.player.belt.length) ? data.player.belt : state.belt;
+            state.day = (data.world && data.world.day) || 1;
             state.time = data.time;
+            if (data.world && data.world.weather) {
+                const w = WeatherSystem.fromJSON(data.world.weather);
+                weather.current = w.current;
+                weather.timeLeft = w.timeLeft;
+            }
+
+            // Restore pending respawns (remaining seconds preserved across reloads)
+            if (data.world && Array.isArray(data.world.respawns)) {
+                for (const r of data.world.respawns) {
+                    if (!r || !r.type || !r.pos) continue;
+                    respawnQueue.push({
+                        pos: r.pos, type: r.type, worldData: r.worldData || null,
+                        time: Date.now(), delay: (r.remaining || 60) * 1000
+                    });
+                }
+            }
+
+            // Restore storage boxes (replace the fresh camp box to avoid duplicates)
+            for (const b of storageBoxes.slice()) {
+                scene.remove(b.mesh);
+                for (const arr of [interactables, collisionObjects]) {
+                    const i = arr.indexOf(b.mesh);
+                    if (i !== -1) arr.splice(i, 1);
+                }
+                storageBoxes.splice(storageBoxes.indexOf(b), 1);
+            }
+            if (data.world && Array.isArray(data.world.storages)) {
+                for (const s of data.world.storages) {
+                    if (s && typeof s.x === 'number') spawnStorageBox(s.x, s.z, s.inv);
+                }
+            }
+            if (!storageBoxes.length) spawnStorageBox(-4, 3, null);
 
             // Restore Structures
-            data.structures.forEach(s => {
+            (data.buildings.structures || []).forEach(s => {
                 let layout = BUILDING_TYPES[s.type];
                 if (!layout && s.isTC) layout = BUILDING_TYPES.tool_cupboard;
                 if (!layout) layout = BUILDING_TYPES.foundation; // Fallback
@@ -1682,8 +2358,12 @@ try {
         }
     }
 
-    // Auto-Save every 60 seconds
-    setInterval(saveGame, 60000);
+    // Auto-Save every 60 seconds + on tab hide/close + after major events.
+    setInterval(saveGame, SURVIVAL_CONFIG.autosaveIntervalMs);
+    window.addEventListener('pagehide', () => { try { saveGame(); } catch (_) {} });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') { try { saveGame(); } catch (_) {} }
+    });
 
     // Respawn check every 5 seconds
     setInterval(processRespawns, 5000);
@@ -1706,6 +2386,15 @@ try {
 
     // 🌐 تصدير مراجع المحرك لنظام الموت/المكافأة (نطاق الوحدة)
     window.__rustCore = { camera, pointerControls };
+    // Phase 1: QA bridge — exposes try-scoped systems to the top-level debug API.
+    window.__phase1 = {
+        save: () => saveGame(),
+        load: () => loadGame(),
+        use: (id) => useConsumable(id),
+        craft: (id) => window.performCraft(id),
+        weather: () => weather.current,
+        storageCount: () => storageBoxes.length,
+    };
 
 } catch (err) {
     console.error("Critical Failure:", err);
@@ -1862,6 +2551,7 @@ async function reviveWithAd() {
 
     doRevive();
     showNotification('✨ نجوت بفضل الإعلان!', '#f39c12');
+    try { saveGame(); } catch (_) {} // Phase 1: persist after revive
 }
 
 function giveUpRespawn() {
@@ -1877,11 +2567,14 @@ function giveUpRespawn() {
 }
 
 function doRevive() {
-    // استعادة الصحة والجوع والعطش
+    // استعادة الصحة والجوع والعطش (+ Phase 1: stamina/temperature/bleeding)
     state.stats.health = 100;
     state.stats.hunger = 80;
     state.stats.thirst = 80;
     state.stats.radiation = 0;
+    state.stats.stamina = 100;
+    state.stats.temperature = 90;
+    state.stats.bleeding = 0;
     state.dead = false;
 
     // العودة لنقطة البداية (المخيم الأساسي)
@@ -1913,4 +2606,17 @@ window.RustGameDebug = {
     getHealth: () => state.stats.health,
     isDead: () => state.dead,
     reviveCount: () => state.reviveCount,
+    // Phase 1 probes (bridged into the engine scope via window.__phase1):
+    getStats: () => ({ ...state.stats }),
+    setStat: (k, v) => { if (k in state.stats) state.stats[k] = v; },
+    give: (id, n) => addItem(id, n || 1),
+    getDay: () => state.day,
+    saveVersion: () => SAVE_VERSION,
+    save: () => window.__phase1 && window.__phase1.save(),
+    load: () => window.__phase1 && window.__phase1.load(),
+    use: (id) => window.__phase1 && window.__phase1.use(id),
+    craft: (id) => window.__phase1 && window.__phase1.craft(id),
+    weather: () => (window.__phase1 ? window.__phase1.weather() : 'n/a'),
+    clock: () => ({ day: state.day, time: state.time }),
+    storageCount: () => (window.__phase1 ? window.__phase1.storageCount() : -1),
 };

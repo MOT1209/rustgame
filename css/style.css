@@ -6,6 +6,8 @@
     --hunger: linear-gradient(90deg, #f39c12, #f1c40f);
     --thirst: linear-gradient(90deg, #2980b9, #3498db);
     --radiation: linear-gradient(90deg, #27ae60, #2ecc71);
+    --stamina: linear-gradient(90deg, #16a085, #1abc9c);
+    --temperature: linear-gradient(90deg, #d35400, #e67e22);
     --bg-dark: rgba(10, 10, 10, 0.98);
     --border: rgba(255, 255, 255, 0.08);
     --slot-bg: rgba(255, 255, 255, 0.02);
@@ -103,6 +105,24 @@ html {
 
 .radiation .bar-fill {
     background: var(--radiation);
+}
+
+/* Phase 1: stamina + temperature bars */
+.stamina .bar-fill {
+    background: var(--stamina);
+}
+
+.temperature .bar-fill {
+    background: var(--temperature);
+}
+
+#clock-label {
+    color: #fff;
+    font-weight: bold;
+    font-size: 0.85rem;
+    opacity: 0.85;
+    margin-top: 4px;
+    text-shadow: 1px 1px 2px #000;
 }
 
 .stats {
