@@ -52,6 +52,9 @@ function setText(id, text) {
  * Update all survival bars + clock. Safe to call every frame
  * (writes are cached). stats: {health,hunger,thirst,radiation,
  * stamina,temperature}.
+ * @param {any} stats
+ * @param {{day:number,time:number}|null} [clock]
+ * @param {number} [dayLength]
  */
 export function updateSurvivalHud(stats, clock = null, dayLength = 800) {
     if (!stats) return;

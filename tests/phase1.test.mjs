@@ -1,13 +1,13 @@
 // ============================================================
 // RUSTGAME — Phase 1 test suite (Node, no DOM, no THREE).
-// Run: node tests/phase1.test.mjs   (exit 0 = all pass)
+// Run: vitest run
 // ============================================================
 
 import { strict as assert } from 'node:assert';
-import { SURVIVAL_CONFIG, SAVE_VERSION } from '../js/core/config.js';
-import { DamageSystem, DamageTypes } from '../js/player/damage.js';
-import { StaminaSystem } from '../js/player/stamina.js';
-import { SurvivalSystem, hungerState, thirstState } from '../js/player/survival.js';
+import { SURVIVAL_CONFIG, SAVE_VERSION } from '../js/core/config.ts';
+import { DamageSystem, DamageTypes } from '../js/player/damage.ts';
+import { StaminaSystem } from '../js/player/stamina.ts';
+import { SurvivalSystem, hungerState, thirstState } from '../js/player/survival.ts';
 import { FOOD_DEFS, getStackLimit } from '../js/inventory/items.js';
 import { StorageInventory } from '../js/inventory/storage.js';
 import { PHASE1_RECIPES, canCraft, craft, missingFor } from '../js/crafting/recipes.js';
@@ -20,17 +20,7 @@ import { SaveSystem } from '../js/save/save-system.js';
 import { InputSystem, Actions, keyboardProvider, touchProvider } from '../js/input/input.js';
 import { formatClock, statPercent } from '../js/ui/hud.js';
 
-let passed = 0;
-function test(name, fn) {
-    try {
-        fn();
-        passed++;
-        console.log('PASS: ' + name);
-    } catch (e) {
-        console.error('FAIL: ' + name + ' — ' + e.message);
-        process.exitCode = 1;
-    }
-}
+import { test } from 'vitest';
 
 const REG = { wood: 1, stone: 1, cloth: 1, berry: 1, bandage: 1, water: 1, canned_food: 1 };
 
@@ -246,9 +236,10 @@ test('interaction: priority + act dispatch', () => {
     sys.register('a', { priority: 1, canInteract: () => true, label: () => 'A', act: () => 'a-done' });
     sys.register('b', { priority: 5, canInteract: (c) => c.near, label: () => 'B', act: () => 'b-done' });
     const found = sys.getInteractable({ near: true });
-    assert.equal(found.kind, 'b');
+    assert.ok(found && found.kind === 'b');
     assert.equal(sys.interact({ near: true }), true);
-    assert.equal(sys.getInteractable({ near: false }).kind, 'a');
+    const fallback = sys.getInteractable({ near: false });
+    assert.ok(fallback && fallback.kind === 'a');
 });
 
 // ---------- save ----------
@@ -260,16 +251,43 @@ test('save: v1 migrates with defaults', () => {
     });
     const s = SaveSystem.loadFromString(v1);
     assert.ok(s);
-    assert.equal(s.saveVersion, 2);
-    assert.equal(s.player.stats.stamina, 100);
-    assert.equal(s.player.stats.temperature, 100);
-    assert.equal(s.world.day, 1);
+    assert.equal(s && s.saveVersion, 2);
+    assert.equal(s && s.player.stats.stamina, 100);
+    assert.equal(s && s.player.stats.temperature, 100);
+    assert.equal(s && s.world.day, 1);
 });
 test('save: corruption rejected, negatives cleaned', () => {
     assert.equal(SaveSystem.loadFromString('not json{{'), null);
     assert.equal(SaveSystem.loadFromString(''), null);
     const s = SaveSystem.migrate({ saveVersion: 2, inventory: [{ id: 'wood', count: -5 }, { id: 'x' }], player: {} });
-    assert.deepEqual(s.inventory, []);
+    assert.ok(s);
+    assert.deepEqual(s && s.inventory, []);
+});
+test('save: fuzz garbage never throws (no crash, null or clean save)', () => {
+    // Axis 4: a corrupt save must surface as rejection, never an exception.
+    // The game turns rejection into a "Save corrupted — fresh start" notification.
+    const garbage = [
+        null, undefined, 42, 'x', [], {}, '{"a":',
+        { saveVersion: 2, player: null, inventory: 'nope', world: 7, buildings: 0 },
+        { version: 1.0, player: { stats: { health: 'a lot' }, inventory: [{ id: 5, count: {} }] } },
+        { saveVersion: 99, player: { position: [1, 2] }, inventory: [{}, null, 3] },
+        JSON.stringify({ saveVersion: 2, inventory: new Array(500).fill({ id: 'wood', count: 1 }) }),
+    ];
+    for (const g of garbage) {
+        let out;
+        if (typeof g === 'string' && (g.startsWith('{') || g.startsWith('['))) {
+            out = SaveSystem.loadFromString(g);
+        } else {
+            out = SaveSystem.migrate(/** @type {any} */ (g));
+        }
+        assert.ok(out === null || out.saveVersion === 2, 'fuzz case must be null or v2');
+        if (out) {
+            assert.ok(Array.isArray(out.inventory));
+            for (const e of out.inventory) {
+                assert.ok(typeof e.id === 'string' && e.count > 0);
+            }
+        }
+    }
 });
 test('save: storage backend roundtrip', () => {
     const mem = new Map();
@@ -277,7 +295,8 @@ test('save: storage backend roundtrip', () => {
     const blank = SaveSystem.blank();
     assert.ok(SaveSystem.write(backend, 'k', blank));
     const back = SaveSystem.read(backend, 'k');
-    assert.equal(back.saveVersion, 2);
+    assert.ok(back);
+    assert.equal(back && back.saveVersion, 2);
 });
 
 // ---------- input ----------
@@ -305,4 +324,4 @@ test('hud: clock + percent', () => {
     assert.equal(statPercent(-5, 100), 0);
 });
 
-console.log(`\nTOTAL PASS: ${passed}`);
+

@@ -5,6 +5,8 @@
 // Pure module: no DOM, no THREE. Testable in Node.
 // ============================================================
 
+import type { DamageableStats, DamageType } from '../types/game.ts';
+
 export const DamageTypes = {
     GENERIC: 'generic',
     FALL: 'fall',
@@ -15,10 +17,10 @@ export const DamageTypes = {
     RADIATION: 'radiation',
     COLD: 'cold',
     BLEEDING: 'bleeding',
-};
+} as const satisfies Record<string, DamageType>;
 
-function isValidStats(stats) {
-    return stats && typeof stats === 'object' && typeof stats.health === 'number';
+function isValidStats(stats: unknown): stats is DamageableStats {
+    return !!stats && typeof stats === 'object' && typeof (stats as DamageableStats).health === 'number';
 }
 
 export const DamageSystem = {
@@ -26,10 +28,10 @@ export const DamageSystem = {
 
     /**
      * Apply damage to a stats object. Returns actual damage dealt.
-     * stats: { health, maxHealth? } — maxHealth optional (defaults 100).
+     * stats: { health, maxHealth? } - maxHealth optional (defaults 100).
      * Never lets health drop below 0 or exceed max via damage.
      */
-    applyDamage(stats, amount, type = DamageTypes.GENERIC) {
+    applyDamage(stats: unknown, amount: number, type: DamageType = DamageTypes.GENERIC): number {
         if (!isValidStats(stats)) return 0;
         if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) return 0;
         const before = stats.health;
@@ -43,7 +45,7 @@ export const DamageSystem = {
      * Heal a stats object. Returns actual amount healed.
      * Healing never exceeds maxHealth (defaults 100).
      */
-    heal(stats, amount) {
+    heal(stats: unknown, amount: number): number {
         if (!isValidStats(stats)) return 0;
         if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) return 0;
         const max = typeof stats.maxHealth === 'number' ? stats.maxHealth : 100;
@@ -52,7 +54,7 @@ export const DamageSystem = {
         return stats.health - before;
     },
 
-    isDead(stats) {
+    isDead(stats: unknown): boolean {
         return isValidStats(stats) && stats.health <= 0;
     },
 };

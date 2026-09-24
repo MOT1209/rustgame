@@ -9,8 +9,8 @@ import { getStackLimit } from './items.js';
 
 export class StorageInventory {
     /**
-     * @param {Array<{id,count}>} initial
-     * @param {object|null} registry - known item ids (e.g. ITEMS_DATA + FOOD_DEFS).
+     * @param {Array<{id:string,count:number}>} [initial]
+     * @param {any} [registry] - known item ids (e.g. ITEMS_DATA + FOOD_DEFS).
      *   When null, any string id is accepted (legacy mode).
      */
     constructor(initial = [], registry = null) {
@@ -91,6 +91,10 @@ export class StorageInventory {
         return this.items.map(i => ({ id: i.id, count: i.count }));
     }
 
+    /**
+     * @param {any} data
+     * @param {any} [registry]
+     */
     static fromJSON(data, registry = null) {
         const inv = new StorageInventory([], registry);
         if (Array.isArray(data)) {

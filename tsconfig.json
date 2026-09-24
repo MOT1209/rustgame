@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowJs": true,
+    "checkJs": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": [
+    "js/core/**/*.{js,ts}",
+    "js/player/**/*.{js,ts}",
+    "js/inventory/**/*.{js,ts}",
+    "js/crafting/**/*.{js,ts}",
+    "js/world/**/*.{js,ts}",
+    "js/interaction/**/*.{js,ts}",
+    "js/save/**/*.{js,ts}",
+    "js/input/**/*.{js,ts}",
+    "js/ui/**/*.{js,ts}",
+    "js/types/**/*.ts",
+    "tests/**/*.{mjs,ts}"
+  ],
+  "exclude": [
+    "node_modules",
+    "www",
+    "public",
+    "js/game.js"
+  ]
+}

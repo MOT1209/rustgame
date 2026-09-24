@@ -4,10 +4,12 @@
 // Gameplay code must read from here, never hardcode numbers.
 // ============================================================
 
+import type { SurvivalConfig } from '../types/game.ts';
+
 export const SAVE_VERSION = 2;
 export const SAVE_KEY = 'rust_survival_save';
 
-export const SURVIVAL_CONFIG = {
+export const SURVIVAL_CONFIG: SurvivalConfig = {
     // ---- Vitals ----
     maxHealth: 100,
     maxHunger: 100,

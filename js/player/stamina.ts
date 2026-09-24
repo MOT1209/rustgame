@@ -3,34 +3,35 @@
 // Pure module: operates on a stats object { stamina }.
 // ============================================================
 
-import { SURVIVAL_CONFIG } from '../core/config.js';
+import { SURVIVAL_CONFIG } from '../core/config.ts';
+import type { StaminaStats } from '../types/game.ts';
 
 const C = SURVIVAL_CONFIG;
 
 export const StaminaSystem = {
-    /** Clamp helper — keeps stamina within [0, max]. */
-    clamp(stats) {
+    /** Clamp helper - keeps stamina within [0, max]. */
+    clamp(stats: StaminaStats): number {
         const max = C.maxStamina;
         if (typeof stats.stamina !== 'number' || !isFinite(stats.stamina)) stats.stamina = C.staminaStart;
         stats.stamina = Math.max(0, Math.min(max, stats.stamina));
         return stats.stamina;
     },
 
-    canSprint(stats) {
+    canSprint(stats: StaminaStats): boolean {
         return this.clamp(stats) >= C.minimumSprintStamina;
     },
 
-    drainSprint(stats, dt) {
+    drainSprint(stats: StaminaStats, dt: number): number {
         stats.stamina = Math.max(0, (stats.stamina || 0) - C.sprintDrain * dt);
         return stats.stamina;
     },
 
-    drainJump(stats) {
+    drainJump(stats: StaminaStats): number {
         stats.stamina = Math.max(0, (stats.stamina || 0) - C.jumpDrain);
         return stats.stamina;
     },
 
-    drainGather(stats) {
+    drainGather(stats: StaminaStats): number {
         stats.stamina = Math.max(0, (stats.stamina || 0) - C.gatherDrain);
         return stats.stamina;
     },
@@ -39,7 +40,7 @@ export const StaminaSystem = {
      * Regenerate stamina. opts: { freezing: bool, moving: bool }
      * No regen while sprinting (caller passes sprinting flag).
      */
-    regen(stats, dt, opts = {}) {
+    regen(stats: StaminaStats, dt: number, opts: { freezing?: boolean; sprinting?: boolean } = {}): number {
         if (opts.sprinting) return stats.stamina;
         const rate = opts.freezing ? C.regenRateCold : C.regenRate;
         stats.stamina = Math.min(C.maxStamina, (stats.stamina || 0) + rate * dt);
@@ -50,7 +51,11 @@ export const StaminaSystem = {
      * Full per-tick update. Returns { sprinting } after enforcing the lockout:
      * if stamina hits 0 while sprinting, sprinting is force-stopped.
      */
-    update(stats, dt, intent) {
+    update(
+        stats: StaminaStats,
+        dt: number,
+        intent?: { wantSprint?: boolean; didJump?: boolean; didGather?: boolean; freezing?: boolean },
+    ): { sprinting: boolean } {
         // intent: { wantSprint, didJump, didGather, freezing }
         let sprinting = !!(intent && intent.wantSprint && this.canSprint(stats));
         if (sprinting) this.drainSprint(stats, dt);

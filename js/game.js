@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
 // ---- Phase 1 modular systems (pure, testable, no DOM/THREE) ----
-import { SURVIVAL_CONFIG, SAVE_VERSION, SAVE_KEY } from './core/config.js';
-import { DamageSystem, DamageTypes } from './player/damage.js';
-import { StaminaSystem } from './player/stamina.js';
-import { SurvivalSystem } from './player/survival.js';
+import { SURVIVAL_CONFIG, SAVE_VERSION, SAVE_KEY } from './core/config.ts';
+import { DamageSystem, DamageTypes } from './player/damage.ts';
+import { StaminaSystem } from './player/stamina.ts';
+import { SurvivalSystem } from './player/survival.ts';
 import { FOOD_DEFS } from './inventory/items.js';
 import { StorageInventory } from './inventory/storage.js';
 import { PHASE1_RECIPES } from './crafting/recipes.js';
@@ -2328,7 +2328,13 @@ try {
             updateHUD();
 
         } catch (e) {
+            // Axis 4: corrupt save => visible notification + fresh state, never a crash.
             console.error("Failed to load save:", e);
+            try {
+                SurvivalSystem.normalize(state.stats);
+                updateHUD();
+                showNotification('⚠️ Save corrupted — started fresh (progress kept in memory only)', '#e74c3c');
+            } catch (_) {}
         }
     }
 

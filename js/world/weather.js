@@ -15,7 +15,7 @@ export const WEATHER_STATES = {
 
 export class WeatherSystem {
     /**
-     * @param {object} opts { weights, minDuration, maxDuration, rng }
+     * @param {any} [opts] { weights, minDuration, maxDuration, rng }
      */
     constructor(opts = {}) {
         this.weights = opts.weights || { clear: 60, cloudy: 25, rain: 15, storm: 0 };
@@ -59,6 +59,10 @@ export class WeatherSystem {
         return { current: this.current, timeLeft: Math.max(0, this.timeLeft) };
     }
 
+    /**
+     * @param {any} data
+     * @param {any} [opts]
+     */
     static fromJSON(data, opts = {}) {
         const w = new WeatherSystem(opts);
         if (data && WEATHER_STATES[data.current]) w.current = data.current;

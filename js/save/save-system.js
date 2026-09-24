@@ -6,7 +6,7 @@
 // memory-map in tests). No DOM.
 // ============================================================
 
-import { SAVE_VERSION } from '../core/config.js';
+import { SAVE_VERSION } from '../core/config.ts';
 
 export const SAVE_VERSION_CURRENT = SAVE_VERSION;
 
@@ -33,6 +33,7 @@ function cleanStats(s) {
 
 function cleanInventory(inv) {
     if (!Array.isArray(inv)) return [];
+    /** @type {Array<{id: string, count: number}>} */
     const out = [];
     for (const e of inv) {
         if (!e || typeof e.id !== 'string') continue;
@@ -46,6 +47,9 @@ function cleanInventory(inv) {
 export const SaveSystem = {
     version: SAVE_VERSION_CURRENT,
 
+    /**
+     * @returns {{saveVersion:number,timestamp:number,player:{position:{x:number,y:number,z:number},rotation:{y:number},stats:any,belt:Array<string|null>,dead:boolean},inventory:Array<{id:string,count:number}>,world:{respawns:any[],storages:any[],day:number,weather:any},buildings:{structures:any[],toolCupboards:any[]},time:number}}
+     */
     blank() {
         return {
             saveVersion: SAVE_VERSION_CURRENT,

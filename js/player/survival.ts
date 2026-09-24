@@ -6,32 +6,40 @@
 // Pure module: no DOM, no THREE. Testable in Node.
 // ============================================================
 
-import { SURVIVAL_CONFIG } from '../core/config.js';
-import { DamageSystem, DamageTypes } from './damage.js';
+import { SURVIVAL_CONFIG } from '../core/config.ts';
+import { DamageSystem, DamageTypes } from './damage.ts';
+import type {
+    HungerState,
+    PlayerStats,
+    SurvivalEnv,
+    SurvivalEvent,
+    SurvivalTickResult,
+    ThirstState,
+} from '../types/game.ts';
 
 const C = SURVIVAL_CONFIG;
 
-export function hungerState(value) {
+export function hungerState(value: number): HungerState {
     if (value <= 0) return 'critical';
     if (value > C.hungerStates.normal) return 'normal';
     if (value > C.hungerStates.hungry) return 'hungry';
     return 'starving';
 }
 
-export function thirstState(value) {
+export function thirstState(value: number): ThirstState {
     if (value <= 0) return 'critical';
     if (value > C.thirstStates.normal) return 'normal';
     if (value > C.thirstStates.thirsty) return 'thirsty';
     return 'dehydrated';
 }
 
-function num(v, fallback) {
+function num(v: unknown, fallback: number): number {
     return (typeof v === 'number' && isFinite(v)) ? v : fallback;
 }
 
 export const SurvivalSystem = {
     /** Ensure all Phase-1 stat fields exist (save-migration friendly). */
-    normalize(stats) {
+    normalize(stats: PlayerStats): PlayerStats {
         stats.health = num(stats.health, C.maxHealth);
         stats.hunger = num(stats.hunger, C.hungerStart);
         stats.thirst = num(stats.thirst, C.thirstStart);
@@ -40,7 +48,7 @@ export const SurvivalSystem = {
         stats.radiation = num(stats.radiation, 0);
         stats.bleeding = num(stats.bleeding, 0);
         stats.maxHealth = num(stats.maxHealth, C.maxHealth);
-        stats.health = Math.max(0, Math.min(stats.maxHealth, stats.health));
+        stats.health = Math.max(0, Math.min(stats.maxHealth ?? C.maxHealth, stats.health));
         stats.hunger = Math.max(0, Math.min(C.maxHunger, stats.hunger));
         stats.thirst = Math.max(0, Math.min(C.maxThirst, stats.thirst));
         stats.stamina = Math.max(0, Math.min(C.maxStamina, stats.stamina));
@@ -54,10 +62,10 @@ export const SurvivalSystem = {
      * env: { sprinting, inRadiation, isNight, isRaining, nearFire, inWater }
      * Returns: { events: [{type, ...}], hungerState, thirstState, freezing }
      */
-    tick(stats, dt, env = {}) {
+    tick(stats: PlayerStats, dt: number, env: SurvivalEnv = {}): SurvivalTickResult {
         this.normalize(stats);
         if (!(dt > 0)) dt = 0;
-        const events = [];
+        const events: SurvivalEvent[] = [];
         const prevHunger = hungerState(stats.hunger);
         const prevThirst = thirstState(stats.thirst);
 
@@ -112,7 +120,7 @@ export const SurvivalSystem = {
 
         // ---- Natural regen (well-fed only) ----
         if (stats.hunger >= C.regenHungerMin && stats.thirst >= C.regenThirstMin
-            && stats.health > 0 && stats.health < stats.maxHealth) {
+            && stats.health > 0 && stats.health < (stats.maxHealth ?? C.maxHealth)) {
             DamageSystem.heal(stats, C.naturalRegen * dt);
         }
 
