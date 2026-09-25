@@ -58,6 +58,74 @@ export interface InventoryItem {
     count: number;
 }
 
+// ============================================================
+// Save system shapes (Axis 4) — single source of truth for
+// js/save/save-system.ts. Pure data, no runtime code.
+// ============================================================
+
+/** Minimal storage backend (localStorage in game, memory Map in tests). */
+export interface SaveStorage {
+    getItem(key: string): string | null;
+    setItem(key: string, value: string): void;
+}
+
+export interface SavePlayerPosition {
+    x: number;
+    y: number;
+    z: number;
+}
+
+export interface SavePlayerRotation {
+    y: number;
+}
+
+export interface SavePlayer {
+    position: SavePlayerPosition;
+    rotation: SavePlayerRotation;
+    stats: PlayerStats;
+    belt: Array<string | null>;
+    dead: boolean;
+}
+
+export interface SaveWorld {
+    respawns: Array<Record<string, unknown>>;
+    storages: Array<Record<string, unknown>>;
+    day: number;
+    weather: Record<string, unknown> | null;
+}
+
+export interface SaveStructure {
+    type: string;
+    pos: SavePlayerPosition;
+    rot: number;
+    tier: string;
+    health: number;
+    maxHealth: number;
+    isTC: boolean;
+}
+
+export interface SaveBuildings {
+    structures: Array<SaveStructure | Record<string, unknown>>;
+    toolCupboards: Array<Record<string, unknown>>;
+}
+
+export interface SaveGame {
+    saveVersion: number;
+    timestamp: number;
+    player: SavePlayer;
+    inventory: InventoryItem[];
+    world: SaveWorld;
+    buildings: SaveBuildings;
+    time: number;
+}
+
+export interface SaveAutosaver {
+    markDirty(): void;
+    flush(): boolean;
+    start(): void;
+    stop(): void;
+}
+
 /** Environment flags consumed by SurvivalSystem.tick(). */
 export interface SurvivalEnv {
     sprinting?: boolean;

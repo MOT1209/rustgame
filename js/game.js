@@ -14,7 +14,7 @@ import { WATER_SOURCES, drink as drinkFromSource } from './world/water.js';
 import { WeatherSystem } from './world/weather.js';
 import { DayNight } from './world/day-night.js';
 import { InteractionSystem, InteractKinds } from './interaction/interaction.js';
-import { SaveSystem } from './save/save-system.js';
+import { SaveSystem } from './save/save-system.ts';
 import { InputSystem, Actions, keyboardProvider, touchProvider, gamepadProvider } from './input/input.js';
 import { updateSurvivalHud, setPrompt } from './ui/hud.js';
 

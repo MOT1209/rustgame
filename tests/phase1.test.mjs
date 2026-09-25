@@ -16,7 +16,7 @@ import { drink, getWaterSource } from '../js/world/water.js';
 import { WeatherSystem } from '../js/world/weather.js';
 import { DayNight } from '../js/world/day-night.js';
 import { InteractionSystem } from '../js/interaction/interaction.js';
-import { SaveSystem } from '../js/save/save-system.js';
+import { SaveSystem } from '../js/save/save-system.ts';
 import { InputSystem, Actions, keyboardProvider, touchProvider } from '../js/input/input.js';
 import { formatClock, statPercent } from '../js/ui/hud.js';
 
