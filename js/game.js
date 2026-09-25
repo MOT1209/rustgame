@@ -16,6 +16,7 @@ import { DayNight } from './world/day-night.js';
 import { InteractionSystem, InteractKinds } from './interaction/interaction.js';
 import { SaveSystem } from './save/save-system.ts';
 import { InputSystem, Actions, keyboardProvider, touchProvider, gamepadProvider } from './input/input.js';
+import { UnifiedGameControls } from './input/touch-controls.js';
 import { updateSurvivalHud, setPrompt } from './ui/hud.js';
 
 // Rust Survival Engine v2.5: Initializing with Collision Physics...
@@ -1935,7 +1936,8 @@ try {
             { id: 'jump', label: '⬆️', action: 'jump', key: 'Space', color: '#3498db' },
             { id: 'inventory', label: '🎒', action: 'inventory', key: 'KeyE', color: '#9b59b6' },
             { id: 'crouch', label: '🔽', action: 'crouch', key: 'ControlLeft', color: '#34495e' },
-            { id: 'view', label: '👁️', action: 'view', key: 'KeyV', color: '#1abc9c' }
+            { id: 'view', label: '👁️', action: 'view', key: 'KeyV', color: '#1abc9c' },
+            { id: 'sprint', label: '💨', action: 'sprint', key: 'ShiftLeft', color: '#27ae60', hold: true }
         ],
         onMove: (dx, dy) => {
             state.controls.left = dx < -0.1;
@@ -2000,9 +2002,12 @@ try {
                     showNotification(`View: ${state.viewMode.toUpperCase()}`, '#3498db');
                     break;
                 case 'sprint':
-                    // Sprint is handled in movement logic
+                    // Sprint is a hold state: onHoldChange below owns it.
                     break;
             }
+        },
+        onHoldChange: (action, isDown) => {
+            if (action === 'sprint') state.controls.sprint = isDown;
         },
         debug: false
     });
@@ -2400,6 +2405,17 @@ try {
         craft: (id) => window.performCraft(id),
         weather: () => weather.current,
         storageCount: () => storageBoxes.length,
+        // Read-only snapshot so browser verification can assert on real game state.
+        snapshot: () => ({
+            player: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+            controls: { ...state.controls },
+            day: state.day,
+            time: state.time,
+            weather: weather.current,
+            dead: state.dead,
+            structures: builtStructures.length,
+            pendingRespawns: respawnQueue.length,
+        }),
     };
 
 } catch (err) {

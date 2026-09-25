@@ -5,33 +5,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#ff4444">
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="manifest.json">
     <meta name="description" content="Rashid Rust Survival 3D — Physics-driven sandbox survival game. Mine resources, craft tools, and build structures.">
     <link rel="canonical" href="https://rashid-wep.vercel.app/games/rust-game/">
     <meta property="og:type" content="website">
     <meta property="og:title" content="Rust Survival 3D - Ultra">
     <meta property="og:description" content="Rashid Rust Survival 3D — Physics-driven sandbox survival game.">
-    <meta property="og:image" content="../../images/logo.png">
+    <meta property="og:image" content="https://rashid-wep.vercel.app/games/rust-game/icons/icon-512.png">
     <meta property="og:url" content="https://rashid-wep.vercel.app/games/rust-game/">
     <title>Rust Survival 3D - Ultra</title>
     <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4804302403615958" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/building.css">
+    <link rel="stylesheet" href="css/touch-controls.css">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Game Controls System -->
-    <script>
-        window.__loadOptional = function (src) {
-            return new Promise(function (resolve) {
-                var s = document.createElement('script');
-                s.src = src; s.async = false;
-                s.onload = function () { resolve(true); };
-                s.onerror = function () { console.warn('[rustgame] optional script skipped:', src); resolve(false); };
-                document.head.appendChild(s);
-            });
-        };
-        window.__loadOptional('../../js/unified-game-controls.js');
-    </script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -200,7 +190,7 @@
             <div class="hotbar-slot" id="slot-6"><i class="fas fa-bottle-water"></i></div>
         </div>
 
-        <!-- Mobile Controls are now handled by unified-game-controls.js -->
+        <!-- On-screen touch controls are injected by js/input/touch-controls.js -->
     </div>
 
     <!-- Rust Style Inventory -->
@@ -328,15 +318,11 @@
                 .catch(err => console.log('[Rust Game] SW registration failed:', err));
         }
     </script>
-  <script src="js/update-checker.js"></script>
-  <!-- OTA update checker (local only — no remote duplicate) -->
-  <script>window.RASHID_APP={id:'com.rashid.rustsurvival',version:'1.1.0',name:'Rust Construction'};</script>
-  <!-- AdMob Ads: vendor scripts are optional (present only in production hosting) and load in order -->
-  <script>
-    window.__loadOptional('../../js/vendor/capacitor.js')
-      .then(function () { return window.__loadOptional('../../js/vendor/admob.js'); })
-      .then(function () { return window.__loadOptional('js/ads.js'); });
-  </script>
+  <script type="module" src="js/release/update-checker.js"></script>
+  <!-- OTA update checker (local only — no remote duplicate). Identity + build injected by scripts/sync-version.mjs -->
+  <script>window.RASHID_APP={id:'com.rashid.rustgame',version:'1.1.0',buildNumber:15,name:'Rust Survival 3D'};</script>
+  <!-- Ads layer self-detects the runtime; AdMob plugins only exist inside the Capacitor APK -->
+  <script type="module" src="js/release/ads.js"></script>
 </body>
 
 </html>

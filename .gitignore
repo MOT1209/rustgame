@@ -13,3 +13,11 @@ yarn-error.log*
 # Editor / OS
 .DS_Store
 Thumbs.db
+
+# blender_pro_skills secrets & caches (never commit keys or downloads)
+blender_pro_skills/.env
+blender_pro_skills/cache/
+*.blend1
+
+# browser-verification artifacts
+.playwright-mcp/

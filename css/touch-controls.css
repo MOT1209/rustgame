@@ -1,0 +1,92 @@
+/* Unified on-screen controls (js/input/touch-controls.js).
+   The container is only injected on touch devices, so it is never explicitly
+   hidden here. Base geometry lives in css/style.css (#mobile-controls, #joystick-*). */
+
+#mobile-controls .mobile-btn {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#mobile-controls .mobile-btn.is-active {
+    background: var(--primary, #cd5c2c);
+    transform: scale(0.9);
+}
+
+#mobile-controls .mobile-btn.hold {
+    opacity: 0.75;
+}
+
+#joystick-zone {
+    touch-action: none;
+}
+
+#look-zone {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 55%;
+    height: 100%;
+    pointer-events: all;
+    touch-action: none;
+    background: transparent;
+}
+
+/* Seven action buttons must fit a landscape phone (≈390px tall) in two columns. */
+#action-buttons {
+    bottom: 20px;
+    right: 20px;
+    width: 170px;
+    flex-direction: row;
+    flex-wrap: wrap-reverse;
+    align-content: flex-end;
+    gap: 10px;
+    max-height: none;
+    overflow: visible;
+    z-index: 2;
+}
+
+@media (max-height: 480px) {
+    #action-buttons {
+        width: 138px;
+        gap: 8px;
+    }
+
+    #action-buttons .mobile-btn {
+        width: 58px;
+        height: 58px;
+        font-size: 1.15rem;
+    }
+
+    #joystick-zone {
+        width: 118px;
+        height: 118px;
+        bottom: 26px;
+        left: 26px;
+    }
+
+    #joystick-stick {
+        width: 50px;
+        height: 50px;
+    }
+}
+
+#rotate-device {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12%;
+    text-align: center;
+    background: rgba(10, 10, 12, 0.94);
+    color: #f5f5f5;
+    font-size: 1.2rem;
+    line-height: 1.5;
+    pointer-events: all;
+    z-index: 10;
+}
+
+#rotate-device[hidden] {
+    display: none;
+}
