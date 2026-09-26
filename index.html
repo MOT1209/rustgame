@@ -281,6 +281,17 @@
             <p><span>R</span> Rotate | <span>G</span> Blueprint | <span>H</span> Upgrade</p>
 
         </div>
+        <div id="touch-hints">
+            <p><span>🕹️</span> Left stick to move | drag right side to look</p>
+            <p>Buttons: <span>⚔️</span> act · <span>⬆️</span> jump · <span>🎒</span> bag · <span>💨</span> hold to sprint</p>
+        </div>
+        <!-- M1: device scheme selector (auto = detect per runtime) -->
+        <div id="device-mode-row" role="group" aria-label="Device mode">
+            <span class="device-mode-label">الجهاز:</span>
+            <button id="device-mode-auto" onclick="window.__setDeviceMode && window.__setDeviceMode('auto')">تلقائي</button>
+            <button id="device-mode-phone" onclick="window.__setDeviceMode && window.__setDeviceMode('phone')">📱 هاتف</button>
+            <button id="device-mode-desktop" onclick="window.__setDeviceMode && window.__setDeviceMode('desktop')">🖥️ كمبيوتر</button>
+        </div>
         <button id="start-button">START SURVIVAL</button>
         <p style="margin-top: 20px; font-size: 0.8rem; opacity: 0.5;">Version 1.1.0 — Building, Crafting & Survival
         </p>

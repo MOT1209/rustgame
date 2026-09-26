@@ -70,8 +70,12 @@ export class UnifiedGameControls {
         this.listeners = [];
     }
 
-    init() {
-        if (this.mounted || !isTouchDevice()) return this;
+    /**
+     * Mount the on-screen controls. No-op on non-touch hardware unless
+     * `force` is true (manual "phone" mode from the device setting).
+     */
+    init(force = false) {
+        if (this.mounted || (!force && !isTouchDevice())) return this;
         this.mounted = true;
         this.root = this.buildUi();
         document.body.appendChild(this.root);

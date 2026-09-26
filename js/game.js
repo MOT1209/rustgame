@@ -15,6 +15,7 @@ import { WeatherSystem } from './world/weather.js';
 import { DayNight } from './world/day-night.js';
 import { InteractionSystem, InteractKinds } from './interaction/interaction.js';
 import { SaveSystem } from './save/save-system.ts';
+import { detectRuntime, loadMode, resolveDevice, saveMode } from './core/platform.ts';
 import { InputSystem, Actions, keyboardProvider, touchProvider, gamepadProvider } from './input/input.js';
 import { UnifiedGameControls } from './input/touch-controls.js';
 import { updateSurvivalHud, setPrompt } from './ui/hud.js';
@@ -534,6 +535,36 @@ try {
     const interactables = [];
     const collisionObjects = [];
     const builtStructures = [];
+
+    // ==================== PLATFORM / DEVICE MODE (M1) ====================
+    // One build, three targets: web hosts both schemes, APK defaults to
+    // phone, Electron .exe defaults to desktop. The user override lives in
+    // localStorage (per-device preference, never in the save file).
+    const deviceEnv = {
+        touchPoints: Number(navigator.maxTouchPoints) || 0,
+        touchEvents: 'ontouchstart' in window,
+        coarsePointer: !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches),
+        minViewportSide: Math.min(window.innerWidth || 0, window.innerHeight || 0),
+    };
+    const runtimeKind = detectRuntime({
+        capacitorNative: !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()),
+        electron: window.RASHID_RUNTIME === 'electron',
+    });
+    let deviceKind = resolveDevice(loadMode(localStorage), deviceEnv, runtimeKind);
+
+    /** Apply a mode: persist, resolve, toggle UI scheme + touch layer. */
+    function applyDeviceMode(mode) {
+        saveMode(localStorage, mode);
+        deviceKind = resolveDevice(mode, deviceEnv, runtimeKind);
+        document.body.dataset.device = deviceKind;
+        if (deviceKind === 'phone') gameControls.init(true);
+        else gameControls.destroy();
+        for (const m of ['auto', 'phone', 'desktop']) {
+            const btn = document.getElementById('device-mode-' + m);
+            if (btn) btn.classList.toggle('active', loadMode(localStorage) === m);
+        }
+    }
+    window.__setDeviceMode = (mode) => applyDeviceMode(mode);
 
     // ==================== BUILDING SYSTEM ====================
     function initBlueprintSelector() {
@@ -2012,7 +2043,8 @@ try {
         debug: false
     });
     
-    gameControls.init();
+    // Initial device scheme (replaces the unconditional touch init).
+    applyDeviceMode(loadMode(localStorage));
 
     // Init sound on first user interaction
     function initSoundOnInteraction() {
@@ -2028,8 +2060,9 @@ try {
     const startBtn = document.getElementById('start-button');
     if (startBtn) {
         startBtn.onclick = () => {
-            const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-            if (!isTouch) pointerControls.lock();
+            // Pointer lock follows the effective scheme, not raw hardware:
+            // manual "desktop" mode on a touchscreen still gets mouse look.
+            if (deviceKind !== 'phone') pointerControls.lock();
             else document.getElementById('instructions').style.display = 'none';
         };
     }
@@ -2493,6 +2526,9 @@ try {
         placeCampfire: (x, z) => !!placeCampfire(x, z),
         // Read-only snapshot so browser verification can assert on real game state.
         snapshot: () => ({
+            device: deviceKind,
+            deviceMode: loadMode(localStorage),
+            runtime: runtimeKind,
             player: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
             controls: { ...state.controls },
             day: state.day,

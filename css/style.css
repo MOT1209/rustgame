@@ -765,3 +765,50 @@ html {
 .death-revive-flash {
     animation: revive-flash 0.8s ease-out;
 }
+
+/* M1: device scheme (phone / desktop / web selector) */
+#touch-hints {
+    display: none;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    opacity: 0.85;
+    line-height: 1.7;
+}
+#touch-hints span {
+    color: #ffd28a;
+    font-weight: bold;
+}
+body[data-device="phone"] #touch-hints {
+    display: block;
+}
+body[data-device="phone"] #instructions .controls-guide {
+    display: none;
+}
+#device-mode-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+.device-mode-label {
+    opacity: 0.7;
+    font-size: 0.9rem;
+}
+#device-mode-row button {
+    padding: 6px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+#device-mode-row button:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+#device-mode-row button.active {
+    border-color: var(--primary);
+    background: rgba(205, 92, 44, 0.25);
+}
