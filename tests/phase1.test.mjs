@@ -27,7 +27,7 @@ const REG = { wood: 1, stone: 1, cloth: 1, berry: 1, bandage: 1, water: 1, canne
 // ---------- config ----------
 test('config: thirst drains faster than hunger', () => {
     assert.ok(SURVIVAL_CONFIG.thirstDrain > SURVIVAL_CONFIG.hungerDrain);
-    assert.equal(SAVE_VERSION, 2);
+    assert.equal(SAVE_VERSION, 3);
 });
 
 // ---------- damage ----------
@@ -251,7 +251,7 @@ test('save: v1 migrates with defaults', () => {
     });
     const s = SaveSystem.loadFromString(v1);
     assert.ok(s);
-    assert.equal(s && s.saveVersion, 2);
+    assert.equal(s && s.saveVersion, SAVE_VERSION);
     assert.equal(s && s.player.stats.stamina, 100);
     assert.equal(s && s.player.stats.temperature, 100);
     assert.equal(s && s.world.day, 1);
@@ -262,6 +262,7 @@ test('save: corruption rejected, negatives cleaned', () => {
     const s = SaveSystem.migrate({ saveVersion: 2, inventory: [{ id: 'wood', count: -5 }, { id: 'x' }], player: {} });
     assert.ok(s);
     assert.deepEqual(s && s.inventory, []);
+    assert.deepEqual(s && s.world.campfires, []);
 });
 test('save: fuzz garbage never throws (no crash, null or clean save)', () => {
     // Axis 4: a corrupt save must surface as rejection, never an exception.
@@ -280,7 +281,7 @@ test('save: fuzz garbage never throws (no crash, null or clean save)', () => {
         } else {
             out = SaveSystem.migrate(/** @type {any} */ (g));
         }
-        assert.ok(out === null || out.saveVersion === 2, 'fuzz case must be null or v2');
+        assert.ok(out === null || out.saveVersion === SAVE_VERSION, `fuzz case must be null or v${SAVE_VERSION}`);
         if (out) {
             assert.ok(Array.isArray(out.inventory));
             for (const e of out.inventory) {
@@ -296,7 +297,8 @@ test('save: storage backend roundtrip', () => {
     assert.ok(SaveSystem.write(backend, 'k', blank));
     const back = SaveSystem.read(backend, 'k');
     assert.ok(back);
-    assert.equal(back && back.saveVersion, 2);
+    assert.equal(back && back.saveVersion, SAVE_VERSION);
+    assert.equal(SaveSystem.lastReadStatus, 'ok');
 });
 
 // ---------- input ----------

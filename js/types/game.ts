@@ -87,9 +87,15 @@ export interface SavePlayer {
     dead: boolean;
 }
 
+export interface SaveCampfire {
+    x: number;
+    z: number;
+}
+
 export interface SaveWorld {
     respawns: Array<Record<string, unknown>>;
     storages: Array<Record<string, unknown>>;
+    campfires: Array<SaveCampfire>;
     day: number;
     weather: Record<string, unknown> | null;
 }
@@ -102,6 +108,8 @@ export interface SaveStructure {
     health: number;
     maxHealth: number;
     isTC: boolean;
+    isDoor: boolean;
+    isOpen: boolean;
 }
 
 export interface SaveBuildings {

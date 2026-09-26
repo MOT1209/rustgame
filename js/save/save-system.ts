@@ -1,7 +1,8 @@
 // ============================================================
 // RUSTGAME — Axis 4: Save System (versioned, validated, migrating)
-// Save shape (v2):
+// Save shape (v3):
 // { saveVersion, timestamp, player, inventory, world, buildings, time }
+// v3 adds world.campfires and per-structure door state (isDoor/isOpen).
 // Pure module: storage backend injectable (localStorage in game,
 // memory-map in tests). No DOM, no THREE. Never throws.
 // Storage layout (A/B shutters against corruption):
@@ -9,7 +10,7 @@
 //   `<key>:active`        — pointer to the newest slot ("a" | "b")
 //   `<key>`               — legacy single-slot save (read-only compat)
 // Public API: blank, migrate, loadFromString, toString,
-//   read, write, createAutosaver, lastWriteError
+//   read, write, createAutosaver, lastWriteError, lastReadStatus
 // ============================================================
 
 import { SAVE_VERSION } from '../core/config.ts';
@@ -17,11 +18,16 @@ import type {
     InventoryItem,
     PlayerStats,
     SaveAutosaver,
+    SaveCampfire,
     SaveGame,
     SaveStorage,
+    SaveStructure,
 } from '../types/game.ts';
 
 export const SAVE_VERSION_CURRENT = SAVE_VERSION;
+
+/** Why the last read ended the way it did — surfaced to the UI, never thrown. */
+export type SaveReadStatus = 'ok' | 'missing' | 'corrupt' | 'future-version' | 'error';
 
 type SlotId = 'a' | 'b';
 
@@ -88,6 +94,40 @@ function cleanInventory(inv: unknown): InventoryItem[] {
     return out;
 }
 
+function cleanStructure(s: unknown): SaveStructure {
+    const r: Record<string, unknown> = isObj(s) ? s : {};
+    const pos: Record<string, unknown> = isObj(r['pos']) ? (r['pos'] as Record<string, unknown>) : {};
+    return {
+        type: str(r['type'], 'foundation'),
+        pos: {
+            x: num(pos['x'], 0),
+            y: num(pos['y'], 0),
+            z: num(pos['z'], 0),
+        },
+        rot: num(r['rot'], 0),
+        tier: str(r['tier'], 'twig'),
+        health: num(r['health'], 10),
+        maxHealth: num(r['maxHealth'], 10),
+        isTC: r['isTC'] === true,
+        isDoor: r['isDoor'] === true,
+        isOpen: r['isOpen'] === true,
+    };
+}
+
+function cleanCampfires(v: unknown): SaveCampfire[] {
+    if (!Array.isArray(v)) return [];
+    const out: SaveCampfire[] = [];
+    for (const c of v) {
+        if (!isObj(c)) continue;
+        const rec = c as Record<string, unknown>;
+        const x = num(rec['x'], NaN);
+        const z = num(rec['z'], NaN);
+        if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
+        out.push({ x, z });
+    }
+    return out;
+}
+
 function safeGet(storage: SaveStorage, k: string): string | null {
     try {
         return storage.getItem(k);
@@ -107,6 +147,12 @@ export const SaveSystem = {
     /** Last write failure label (null on success). 'quota…'/QuotaExceededError = storage full. */
     lastWriteError: null as string | null,
 
+    /** Outcome of the last read/parse attempt. 'ok' = a save was restored. */
+    lastReadStatus: 'missing' as SaveReadStatus,
+
+    /** True when the stored save was written by a newer build (must not be overwritten). */
+    isFutureVersion: false as boolean,
+
     blank(): SaveGame {
         return {
             saveVersion: SAVE_VERSION_CURRENT,
@@ -119,17 +165,27 @@ export const SaveSystem = {
                 dead: false,
             },
             inventory: [],
-            world: { respawns: [], storages: [], day: 1, weather: null },
+            world: { respawns: [], storages: [], campfires: [], day: 1, weather: null },
             buildings: { structures: [], toolCupboards: [] },
             time: 0,
         };
     },
 
-    /** Migrate any older save to current shape. Never throws. */
+    /**
+     * Migrate any older save to the current shape. Never throws.
+     * Returns null for unparseable data and for saves from a NEWER build —
+     * downgrading those would silently destroy fields this build cannot read.
+     */
     migrate(data: unknown): SaveGame | null {
         if (!isObj(data)) return null;
         const rec = data as Record<string, unknown>;
         const v = num(rec['version'], num(rec['saveVersion'], SAVE_VERSION_CURRENT));
+        if (v > SAVE_VERSION_CURRENT) {
+            this.isFutureVersion = true;
+            this.lastReadStatus = 'future-version';
+            return null;
+        }
+        this.isFutureVersion = false;
         const out: SaveGame = this.blank();
         try {
             if (v === 1 || v === 1.0) {
@@ -154,28 +210,14 @@ export const SaveSystem = {
                 out.inventory = cleanInventory(p['inventory']);
                 out.time = num(rec['time'], 0);
                 if (Array.isArray(rec['structures'])) {
-                    const structs = (rec['structures'] as unknown[]).filter(isObj).map((s) => ({
-                        type: str(s['type'], 'foundation'),
-                        pos: isObj(s['pos'])
-                            ? {
-                                  x: num((s['pos'] as Record<string, unknown>)['x'], 0),
-                                  y: num((s['pos'] as Record<string, unknown>)['y'], 0),
-                                  z: num((s['pos'] as Record<string, unknown>)['z'], 0),
-                              }
-                            : { x: 0, y: 0, z: 0 },
-                        rot: num(s['rot'], 0),
-                        tier: str(s['tier'], 'twig'),
-                        health: num(s['health'], 10),
-                        maxHealth: num(s['maxHealth'], 10),
-                        isTC: s['isTC'] === true,
-                    }));
+                    const structs = (rec['structures'] as unknown[]).filter(isObj).map(cleanStructure);
                     out.buildings.structures = structs;
                     out.buildings.toolCupboards = structs
                         .filter((s) => s.isTC)
                         .map((s) => ({ pos: { x: s.pos.x, z: s.pos.z }, radius: 25 }));
                 }
             } else {
-                // ---- v2 (current): validate + fill defaults ----
+                // ---- v2 and v3: validate + fill defaults ----
                 const p: Record<string, unknown> = isObj(rec['player']) ? rec['player'] : {};
                 const pos = p['position'];
                 if (isObj(pos)) {
@@ -204,13 +246,15 @@ export const SaveSystem = {
                     storages: Array.isArray(w['storages'])
                         ? (w['storages'] as unknown[]).filter(isObj)
                         : [],
+                    // v2 saves simply have no campfires — default to none.
+                    campfires: cleanCampfires(w['campfires']),
                     day: Math.max(1, Math.floor(num(w['day'], 1))),
                     weather: isObj(w['weather']) ? w['weather'] : null,
                 };
                 const b: Record<string, unknown> = isObj(rec['buildings']) ? rec['buildings'] : {};
                 out.buildings = {
                     structures: Array.isArray(b['structures'])
-                        ? (b['structures'] as unknown[]).filter(isObj)
+                        ? (b['structures'] as unknown[]).filter(isObj).map(cleanStructure)
                         : [],
                     toolCupboards: Array.isArray(b['toolCupboards'])
                         ? (b['toolCupboards'] as unknown[]).filter(isObj)
@@ -227,10 +271,14 @@ export const SaveSystem = {
 
     /** Parse + migrate + validate a raw JSON string. Returns save or null. */
     loadFromString(json: unknown): SaveGame | null {
-        if (typeof json !== 'string' || !json) return null;
+        if (typeof json !== 'string' || !json) {
+            this.lastReadStatus = 'corrupt';
+            return null;
+        }
         try {
             return this.migrate(JSON.parse(json) as unknown);
         } catch {
+            this.lastReadStatus = 'corrupt';
             return null;
         }
     },
@@ -247,8 +295,14 @@ export const SaveSystem = {
      * Read with A/B + legacy fallback. Tries `<key>:a`, `<key>:b` and
      * legacy `<key>`; corrupt slots are ignored, newest timestamp wins.
      * Never throws — returns null when nothing valid exists.
+     * `lastReadStatus` distinguishes: no save at all ('missing') vs a save
+     * that exists but could not be used ('corrupt' / 'future-version').
      */
     read(storage: SaveStorage, key: string): SaveGame | null {
+        // Every read starts from a clean slate: the status describes THIS read,
+        // never a previous one.
+        this.lastReadStatus = 'missing';
+        this.isFutureVersion = false;
         try {
             const active = readActiveSlot(storage, key);
             const ordered: string[] =
@@ -258,20 +312,41 @@ export const SaveSystem = {
                       ? [slotKey(key, 'b'), slotKey(key, 'a'), key]
                       : [slotKey(key, 'a'), slotKey(key, 'b'), key];
             const found: Array<{ save: SaveGame; rank: number }> = [];
+            let sawRaw = false;
+            let sawCorrupt = false;
+            let sawFuture = false;
             ordered.forEach((k, rank) => {
                 const raw = safeGet(storage, k);
                 if (typeof raw !== 'string' || !raw) return;
+                sawRaw = true;
                 const save = this.loadFromString(raw);
-                if (save) found.push({ save, rank });
+                if (save) {
+                    found.push({ save, rank });
+                } else if (this.isFutureVersion) {
+                    sawFuture = true;
+                } else {
+                    sawCorrupt = true;
+                }
             });
-            if (found.length === 0) return null;
+            this.isFutureVersion = sawFuture;
+            if (sawFuture) this.lastReadStatus = 'future-version';
+            if (found.length === 0) {
+                if (!sawFuture && sawRaw && sawCorrupt) this.lastReadStatus = 'corrupt';
+                return null;
+            }
             found.sort((x, y) => {
                 const dt = y.save.timestamp - x.save.timestamp;
                 return dt !== 0 ? dt : x.rank - y.rank;
             });
             const best = found[0];
-            return best ? best.save : null;
+            if (!best) {
+                this.lastReadStatus = 'corrupt';
+                return null;
+            }
+            if (!sawFuture) this.lastReadStatus = 'ok';
+            return best.save;
         } catch {
+            this.lastReadStatus = 'error';
             return null;
         }
     },
@@ -280,8 +355,14 @@ export const SaveSystem = {
      * Write to the unused A/B slot, then flip the `<key>:active` pointer.
      * Keeps `write(): boolean` — failures surface via `lastWriteError`
      * (`QuotaExceededError`/quota label = storage full, for UI later).
+     * Refuses to write when the stored save came from a newer build:
+     * this version cannot represent those fields and would drop them.
      */
     write(storage: SaveStorage, key: string, save: SaveGame): boolean {
+        if (this.isFutureVersion) {
+            this.lastWriteError = 'future-version-readonly';
+            return false;
+        }
         const s = this.toString(save);
         if (s === null) {
             this.lastWriteError = 'encode-failed';

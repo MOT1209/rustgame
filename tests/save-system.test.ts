@@ -7,6 +7,7 @@
 import { strict as assert } from 'node:assert';
 import { test, vi } from 'vitest';
 import { SaveSystem } from '../js/save/save-system.ts';
+import { SAVE_VERSION } from '../js/core/config.ts';
 import type { SaveGame, SaveStorage } from '../js/types/game.ts';
 
 function memBackend(seed?: Record<string, string>): { backend: SaveStorage; mem: Map<string, string> } {
@@ -54,7 +55,7 @@ test('save/ab: corrupt active slot falls back to healthy slot', () => {
     });
     const back = SaveSystem.read(backend, 'k');
     assert.ok(back, 'must recover the healthy slot');
-    assert.equal(back && back.saveVersion, 2);
+    assert.equal(back && back.saveVersion, SAVE_VERSION);
     assert.equal(back && back.timestamp, 777);
 });
 
@@ -63,7 +64,7 @@ test('save/ab: legacy single-key save reads without migration', () => {
     const { backend } = memBackend({ k: good });
     const back = SaveSystem.read(backend, 'k');
     assert.ok(back, 'legacy key must load');
-    assert.equal(back && back.saveVersion, 2);
+    assert.equal(back && back.saveVersion, SAVE_VERSION);
     assert.equal(back && back.timestamp, 1234);
 });
 

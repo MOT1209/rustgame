@@ -2194,8 +2194,9 @@ try {
     });
 
     // ==================== PERSISTENCE SYSTEM (Phase 1: versioned + migrating) ====================
+    let saveFutureVersionWarned = false; // avoid re-warning on every autosave tick
     function saveGame() {
-        // Versioned save (v2); never throws; corruption-safe write.
+        // Versioned save (v3); never throws; corruption-safe write.
         try {
             const saveData = {
                 saveVersion: SAVE_VERSION,
@@ -2211,6 +2212,7 @@ try {
                 world: {
                     day: state.day || 1,
                     weather: weather.toJSON(),
+                    campfires: campfires.map(c => ({ x: c.pos.x, z: c.pos.z })),
                     storages: storageBoxes.map(b => ({ id: b.id, x: b.pos.x, y: b.pos.y, z: b.pos.z, inv: b.inv.toJSON() })),
                     respawns: respawnQueue.map(r => ({
                         type: r.type,
@@ -2227,23 +2229,37 @@ try {
                         tier: s.userData.tier,
                         health: s.userData.health,
                         maxHealth: s.userData.maxHealth,
-                        isTC: s.userData.type === 'tool_cupboard'
+                        isTC: s.userData.type === 'tool_cupboard',
+                        isDoor: s.userData.isDoor === true,
+                        isOpen: s.userData.isOpen === true
                     })),
                     toolCupboards: state.building.toolCupboards
                 },
                 time: state.time
             };
 
-            if (SaveSystem.write(localStorage, SAVE_KEY, saveData)) showNotification("Game Saved");
+            if (SaveSystem.write(localStorage, SAVE_KEY, saveData)) {
+                showNotification("Game Saved");
+            } else if (SaveSystem.lastWriteError === 'future-version-readonly' && !saveFutureVersionWarned) {
+                saveFutureVersionWarned = true;
+                showNotification('⚠️ Save is from a newer version — progress not written', '#e74c3c');
+            }
         } catch (e) {
             console.error('Save failed:', e);
         }
     }
 
     function loadGame() {
-        // Phase 1: parse + migrate (v1→v2) + validate. Corrupt saves reset safely.
+        // Parse + migrate (v1→v3) + validate. Corrupt/future saves reset safely.
         const data = SaveSystem.read(localStorage, SAVE_KEY);
-        if (!data) return;
+        if (!data) {
+            if (SaveSystem.lastReadStatus === 'future-version') {
+                showNotification('⚠️ Save is from a newer version — progress kept in memory only', '#e67e22');
+            } else if (SaveSystem.lastReadStatus === 'corrupt' || SaveSystem.lastReadStatus === 'error') {
+                showNotification('⚠️ Save corrupted — started fresh (previous slot kept)', '#e74c3c');
+            }
+            return;
+        }
 
         try {
             // Restore Player
@@ -2266,7 +2282,9 @@ try {
                 weather.timeLeft = w.timeLeft;
             }
 
-            // Restore pending respawns (remaining seconds preserved across reloads)
+            // Restore pending respawns (remaining seconds preserved across reloads).
+            // The queue is rebuilt from scratch so loadGame() is safe to call twice.
+            respawnQueue.length = 0;
             if (data.world && Array.isArray(data.world.respawns)) {
                 for (const r of data.world.respawns) {
                     if (!r || !r.type || !r.pos) continue;
@@ -2293,7 +2311,37 @@ try {
             }
             if (!storageBoxes.length) spawnStorageBox(-4, 3, null);
 
-            // Restore Structures
+            // Restore campfires (v3): clear existing ones first (idempotent load).
+            for (const c of campfires.slice()) {
+                scene.remove(c.mesh);
+                for (const arr of [interactables, collisionObjects]) {
+                    const i = arr.indexOf(c.mesh);
+                    if (i !== -1) arr.splice(i, 1);
+                }
+                if (c.light && c.light.parent) c.light.parent.remove(c.light);
+                c.mesh.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+                campfires.splice(campfires.indexOf(c), 1);
+            }
+            if (data.world && Array.isArray(data.world.campfires)) {
+                for (const c of data.world.campfires) {
+                    if (c && Number.isFinite(c.x) && Number.isFinite(c.z)) placeCampfire(c.x, c.z);
+                }
+            }
+
+            // Restore Structures: dispose the current ones first so repeated loads
+            // never duplicate meshes, colliders, tool cupboards or GPU resources.
+            for (const s of builtStructures.slice()) {
+                scene.remove(s);
+                for (const arr of [interactables, collisionObjects]) {
+                    const i = arr.indexOf(s);
+                    if (i !== -1) arr.splice(i, 1);
+                }
+                if (s.geometry) s.geometry.dispose();
+                if (s.material) s.material.dispose();
+            }
+            builtStructures.length = 0;
+            state.building.toolCupboards.length = 0;
+
             (data.buildings.structures || []).forEach(s => {
                 let layout = BUILDING_TYPES[s.type];
                 if (!layout && s.isTC) layout = BUILDING_TYPES.tool_cupboard;
@@ -2317,8 +2365,13 @@ try {
                     buildType: s.type,
                     tier: s.tier || 'twig',
                     health: s.health,
-                    maxHealth: s.maxHealth
+                    maxHealth: s.maxHealth,
+                    // Door state must survive reload, otherwise the mesh looks open
+                    // while userData says closed and the first tap appears to do nothing.
+                    isDoor: s.isDoor === true,
+                    isOpen: s.isOpen === true
                 };
+                if (structure.userData.isDoor && !structure.userData.isOpen) structure.rotation.y = 0;
 
                 // Re-register TC
                 if (s.isTC) {
@@ -2405,6 +2458,39 @@ try {
         craft: (id) => window.performCraft(id),
         weather: () => weather.current,
         storageCount: () => storageBoxes.length,
+        // QA-only mutators: place world objects without the raycast/UI path so
+        // save + reload round-trips can be verified in a real browser.
+        placeStructure: (buildType, x, y, z, opts = {}) => {
+            const layout = BUILDING_TYPES[buildType];
+            if (!layout) return false;
+            const tier = BUILDING_TIERS[opts.tier || 'twig'];
+            const structure = new THREE.Mesh(
+                new THREE.BoxGeometry(...layout.geometry),
+                new THREE.MeshStandardMaterial({ color: tier.color, roughness: 0.8 })
+            );
+            structure.position.set(x, y, z);
+            structure.rotation.y = opts.rotY || 0;
+            structure.castShadow = true;
+            structure.receiveShadow = true;
+            structure.userData = {
+                type: buildType === 'tool_cupboard' ? 'tool_cupboard' : (layout.isDoor ? 'door' : 'structure'),
+                buildType,
+                tier: opts.tier || 'twig',
+                health: tier.health,
+                maxHealth: tier.health,
+                isDoor: layout.isDoor === true,
+                isOpen: opts.isOpen === true,
+            };
+            if (buildType === 'tool_cupboard') {
+                state.building.toolCupboards.push({ pos: { x, z }, radius: CONFIG.TC_RADIUS });
+            }
+            if (structure.userData.isOpen) structure.rotation.y = Math.PI / 2;
+            scene.add(structure);
+            builtStructures.push(structure);
+            collisionObjects.push(structure);
+            return true;
+        },
+        placeCampfire: (x, z) => !!placeCampfire(x, z),
         // Read-only snapshot so browser verification can assert on real game state.
         snapshot: () => ({
             player: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
@@ -2414,7 +2500,15 @@ try {
             weather: weather.current,
             dead: state.dead,
             structures: builtStructures.length,
+            campfires: campfires.length,
+            storages: storageBoxes.length,
             pendingRespawns: respawnQueue.length,
+            toolCupboards: state.building.toolCupboards.length,
+            doors: builtStructures.filter(s => s.userData.isDoor).map(s => ({
+                buildType: s.userData.buildType,
+                isOpen: s.userData.isOpen === true,
+                rotY: Number(s.rotation.y.toFixed(3)),
+            })),
         }),
     };
 
