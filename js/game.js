@@ -18,6 +18,9 @@ import { SaveSystem } from './save/save-system.ts';
 import { InputSystem, Actions, keyboardProvider, touchProvider, gamepadProvider } from './input/input.js';
 import { UnifiedGameControls } from './input/touch-controls.js';
 import { updateSurvivalHud, setPrompt } from './ui/hud.js';
+// Phase 2: local-only perf measurement (overlay via ?perf=1 / F3 in dev, benchmarks via window.__perf).
+import { PerfMonitor, benchSeed } from './dev/perf-monitor.js';
+import { runScenario, SCENARIO_ORDER } from './dev/bench-scenarios.js';
 
 // Rust Survival Engine v2.5: Initializing with Collision Physics...
 
@@ -465,6 +468,9 @@ try {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
     document.body.appendChild(renderer.domElement);
+    const perf = new PerfMonitor({ renderer, scene, camera });
+    const benchMode = benchSeed !== null; // ?seed=N — isolated world, never touches the real save
+    let benchForceSim = false;
 
     const pointerControls = new PointerLockControls(camera, document.body);
     playerMesh = createPlayer(scene);
@@ -2052,6 +2058,8 @@ try {
     function animate() {
         requestAnimationFrame(animate);
         const time = performance.now();
+        perf.beginFrame(time);
+        if (!perf.firstFrameAt) perf.firstFrameAt = time;
         const delta = Math.min((time - lastTime) / 1000, 0.1);
 
         // Phase 1: day clock (save-compatible) + weather.
@@ -2082,7 +2090,7 @@ try {
         }
 
         const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-        if (pointerControls.isLocked || isTouch) {
+        if (pointerControls.isLocked || isTouch || benchForceSim) {
             if (state.dead) {
                 // ☠️ اللاعب ميت — تجميد كل المحاكاة (شاشة الموت نشطة)
             } else {
@@ -2183,6 +2191,7 @@ try {
         } else {
             renderer.render(scene, camera);
         }
+        perf.endFrame();
 
         lastTime = time;
     }
@@ -2196,6 +2205,7 @@ try {
     // ==================== PERSISTENCE SYSTEM (Phase 1: versioned + migrating) ====================
     let saveFutureVersionWarned = false; // avoid re-warning on every autosave tick
     function saveGame() {
+        if (benchMode) return; // benchmark worlds must never overwrite the player's save
         // Versioned save (v3); never throws; corruption-safe write.
         try {
             const saveData = {
@@ -2433,7 +2443,7 @@ try {
     setInterval(processRespawns, 5000);
 
     // Initial Load
-    loadGame();
+    if (!benchMode) loadGame();
 
     animate();
     // Hook into animate loop without rewriting the whole function
@@ -2445,8 +2455,54 @@ try {
     setTimeout(() => {
         const loader = document.getElementById('loading-screen');
         if (loader) loader.style.display = 'none';
+        perf.interactiveAt = performance.now();
         updateHUD();
     }, 1500);
+
+    // ==================== PHASE 2: BENCHMARK API ====================
+    const _benchEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+    const benchApi = {
+        worldSize: CONFIG.WORLD_SIZE,
+        forceSimulation: (on) => { benchForceSim = !!on; },
+        setClock: (fraction) => { state.time = fraction * SURVIVAL_CONFIG.dayLength; },
+        setWeather: (id) => { weather.current = id; weather.timeLeft = 1e9; },
+        setLook: (yaw, pitch) => { _benchEuler.set(pitch, yaw, 0, 'YXZ'); camera.quaternion.setFromEuler(_benchEuler); },
+        spawnResource: (type, x, z) => respawnObject({ pos: { x, y: 0, z }, type }),
+        placeStructure: (...a) => window.__phase1.placeStructure(...a),
+        placeCampfire: (x, z) => placeCampfire(x, z),
+        spawnNpc: (type, x, z) => {
+            const npc = new NPC(scene, type, new THREE.Vector3(x, getTerrainHeight(x, z), z), { collisionObjects, npcs });
+            npcs.push(npc); collisionObjects.push(npc.mesh);
+        },
+        pinHealth: () => { state.stats.health = 100; state.stats.bleeding = 0; },
+        selectBlueprint: (type) => { state.selectedBeltSlot = 0; state.belt[0] = 'building_plan'; state.building.selectedBlueprint = type; },
+    };
+    window.__perf = {
+        monitor: perf,
+        api: benchApi,
+        get results() { return perf.results; },
+        loadTimes: () => ({
+            firstFrameMs: Math.round(perf.firstFrameAt || 0),
+            interactiveMs: Math.round(perf.interactiveAt || 0),
+        }),
+        run: (name, opts) => runScenario(perf, benchApi, name, opts),
+        runAll: async (opts) => {
+            const out = [];
+            for (const name of SCENARIO_ORDER) out.push(await runScenario(perf, benchApi, name, opts));
+            return out;
+        },
+        exportJSON: () => JSON.stringify({ ua: navigator.userAgent, results: perf.results }, null, 2),
+    };
+    const benchParam = new URLSearchParams(location.search).get('bench');
+    if (benchMode && benchParam) {
+        // Auto-run one scenario on a fresh page so scenarios never contaminate each other.
+        setTimeout(() => {
+            const ins = document.getElementById('instructions');
+            if (ins) ins.style.display = 'none'; // measure the game view, not the menu overlay
+            window.__perf.run(benchParam).then((r) => { window.__perf.done = r; })
+                .catch((e) => { window.__perf.done = { error: String(e) }; });
+        }, 2500);
+    }
 
     // 🌐 تصدير مراجع المحرك لنظام الموت/المكافأة (نطاق الوحدة)
     window.__rustCore = { camera, pointerControls };
