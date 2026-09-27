@@ -1,0 +1,16 @@
+{
+  "toolCupboardRadius": 25,
+  "tiers": [
+    { "tier": "Twig", "maxHealth": 10, "colorHex": "#d7ccc8", "upgradeCost": [] },
+    { "tier": "Wood", "maxHealth": 250, "colorHex": "#8d6e63", "upgradeCost": [ { "itemId": "wood", "count": 300 } ] },
+    { "tier": "Stone", "maxHealth": 500, "colorHex": "#b0bec5", "upgradeCost": [ { "itemId": "stone", "count": 300 } ] },
+    { "tier": "SheetMetal", "maxHealth": 1000, "colorHex": "#90a4ae", "upgradeCost": [ { "itemId": "frag", "count": 200 } ] },
+    { "tier": "Armored", "maxHealth": 2000, "colorHex": "#eceff1", "upgradeCost": [ { "itemId": "hqm", "count": 50 } ] }
+  ],
+  "notes": [
+    "repairCostFraction is 0.10 for every tier and is charged against the CURRENT tier's own upgradeCost, not the next tier's (verified in game.js repairStructure — this was documented backwards in an earlier draft of the plan).",
+    "Twig repairs for free (its upgradeCost is empty).",
+    "toolCupboardRadius=25 matches CONFIG.TC_RADIUS in game.js — BUILDING_SYSTEM.md originally said 20, which was wrong.",
+    "A 'door' tier existed in the original BUILDING_TIERS but was dead data (every structure, doors included, walks the 5 tiers above) — removed, not ported."
+  ]
+}
