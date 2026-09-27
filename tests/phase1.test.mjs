@@ -22,7 +22,7 @@ import { formatClock, statPercent } from '../js/ui/hud.js';
 
 import { test } from 'vitest';
 
-const REG = { wood: 1, stone: 1, cloth: 1, berry: 1, bandage: 1, water: 1, canned_food: 1 };
+const REG = { wood: 1, stone: 1, cloth: 1, berry: 1, bandage: 1, water: 1, canned_food: 1, lgf: 1 };
 
 // ---------- config ----------
 test('config: thirst drains faster than hunger', () => {
@@ -135,6 +135,20 @@ test('storage: transfer + serialize roundtrip', () => {
     const c = StorageInventory.fromJSON(a.toJSON(), REG);
     assert.equal(c.count('wood'), 6);
 });
+test('storage: maxSlots caps distinct stacks, not restocks', () => {
+    const inv = new StorageInventory([], REG, 2);
+    assert.equal(inv.add('wood', 5), 5);
+    assert.equal(inv.add('stone', 5), 5);
+    // A third distinct item is rejected once both slots are taken.
+    assert.equal(inv.add('cloth', 5), 0);
+    assert.equal(inv.count('cloth'), 0);
+    // Restocking an item already occupying a slot is never blocked by maxSlots.
+    assert.equal(inv.add('wood', 5), 5);
+    assert.equal(inv.count('wood'), 10);
+    // Freeing a slot allows a new item type in again.
+    inv.remove('stone', 5);
+    assert.equal(inv.add('cloth', 3), 3);
+});
 
 // ---------- crafting ----------
 function adapter(inv) {
@@ -146,11 +160,13 @@ function adapter(inv) {
     };
 }
 test('crafting: success consumes + grants', () => {
+    // Official balance (matches ITEMS_DATA.stone_hatchet.recipe in game.js): wood:200, stone:100.
     const inv = new StorageInventory([], { ...REG, stone_hatchet: 1 });
-    inv.add('wood', 100); inv.add('stone', 50);
+    inv.add('wood', 200); inv.add('stone', 100);
     const r = craft(PHASE1_RECIPES.stone_axe, adapter(inv), 1);
     assert.ok(r.ok);
-    assert.equal(inv.count('wood'), 50);
+    assert.equal(inv.count('wood'), 0);
+    assert.equal(inv.count('stone'), 0);
     assert.equal(inv.count('stone_hatchet'), 1);
 });
 test('crafting: failure never goes negative', () => {
@@ -161,8 +177,9 @@ test('crafting: failure never goes negative', () => {
     assert.equal(inv.count('wood'), 10);
 });
 test('crafting: qty multiplies cost', () => {
+    // torch = wood:50, lgf:1 per craft. 2x needs 100 wood/2 lgf; 3x needs 150 wood/3 lgf.
     const inv = new StorageInventory([], { ...REG, torch: 1 });
-    inv.add('wood', 40); inv.add('cloth', 10);
+    inv.add('wood', 120); inv.add('lgf', 2);
     assert.ok(canCraft(PHASE1_RECIPES.torch, adapter(inv), 2));
     assert.ok(!canCraft(PHASE1_RECIPES.torch, adapter(inv), 3));
 });

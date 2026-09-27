@@ -1,0 +1,15 @@
+{
+  "nodes": [
+    { "nodeType": "tree", "resourceItemId": "wood", "nodeHealth": 5, "yieldPerHit": 12, "respawnTimeSeconds": 120, "requiredTool": "Axe" },
+    { "nodeType": "rock", "resourceItemId": "stone", "nodeHealth": 6, "yieldPerHit": 10, "respawnTimeSeconds": 150, "requiredTool": "Pickaxe" },
+    { "nodeType": "iron", "resourceItemId": "iron", "nodeHealth": 6, "yieldPerHit": 8, "respawnTimeSeconds": 180, "requiredTool": "Pickaxe" },
+    { "nodeType": "sulfur", "resourceItemId": "sulfur", "nodeHealth": 6, "yieldPerHit": 8, "respawnTimeSeconds": 180, "requiredTool": "Pickaxe" },
+    { "nodeType": "hemp", "resourceItemId": "cloth", "nodeHealth": 2, "yieldPerHit": 6, "respawnTimeSeconds": 90, "requiredTool": "Hand" },
+    { "nodeType": "berry_bush", "resourceItemId": "berry", "nodeHealth": 2, "yieldPerHit": 5, "respawnTimeSeconds": 100, "requiredTool": "Hand" },
+    { "nodeType": "barrel", "resourceItemId": "scrap", "nodeHealth": 3, "yieldPerHit": 3, "respawnTimeSeconds": 200, "requiredTool": "Any", "bonusResourceId": "lgf", "bonusYield": 2 }
+  ],
+  "notes": [
+    "correctToolMultiplier is 2x for every node when the equipped tool matches requiredTool — the tool never changes hit count, only yield per hit (verified in game.js: node.health -= 1 per hit regardless of tool; yieldForHit() doubles the resource amount).",
+    "hemp and berry_bush originally never respawned in the web game due to a bug (they were missing from the respawn whitelist even though respawnObject fully supported them) — that bug has since been fixed there. Port the FIXED behavior: both respawn normally, same as every other node."
+  ]
+}
