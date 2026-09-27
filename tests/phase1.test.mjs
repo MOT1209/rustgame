@@ -135,6 +135,20 @@ test('storage: transfer + serialize roundtrip', () => {
     const c = StorageInventory.fromJSON(a.toJSON(), REG);
     assert.equal(c.count('wood'), 6);
 });
+test('storage: maxSlots caps distinct stacks, not restocks', () => {
+    const inv = new StorageInventory([], REG, 2);
+    assert.equal(inv.add('wood', 5), 5);
+    assert.equal(inv.add('stone', 5), 5);
+    // A third distinct item is rejected once both slots are taken.
+    assert.equal(inv.add('cloth', 5), 0);
+    assert.equal(inv.count('cloth'), 0);
+    // Restocking an item already occupying a slot is never blocked by maxSlots.
+    assert.equal(inv.add('wood', 5), 5);
+    assert.equal(inv.count('wood'), 10);
+    // Freeing a slot allows a new item type in again.
+    inv.remove('stone', 5);
+    assert.equal(inv.add('cloth', 3), 3);
+});
 
 // ---------- crafting ----------
 function adapter(inv) {

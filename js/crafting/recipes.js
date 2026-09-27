@@ -3,6 +3,15 @@
 // Recipe: { id, name, category, ingredients, result, craftTime,
 //           workbenchRequired }. Pure logic, Node-testable.
 // Inventory adapter: any object with has(id,amt)/remove(id,amt)/add(id,amt).
+//
+// NOT YET WIRED INTO game.js: the live crafting UI (renderCraftingGrid/
+// performCraft) reads costs straight from ITEMS_DATA[id].recipe instead,
+// which has its own (different) numbers for the same items — e.g. stone_axe
+// costs wood:200/stone:100 there vs wood:50/stone:25 here. This module is
+// exercised only by tests/phase1.test.mjs today. Before switching game.js
+// over to call craft()/canCraft() from here, reconcile which ingredient
+// amounts are the intended balance (see docs/UNITY_PORT_PLAN.md §24 for
+// the full audit) — don't silently merge the two and change live costs.
 // ============================================================
 
 export const PHASE1_RECIPES = {

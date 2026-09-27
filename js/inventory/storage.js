@@ -12,10 +12,13 @@ export class StorageInventory {
      * @param {Array<{id:string,count:number}>} [initial]
      * @param {any} [registry] - known item ids (e.g. ITEMS_DATA + FOOD_DEFS).
      *   When null, any string id is accepted (legacy mode).
+     * @param {number} [maxSlots] - max number of distinct item stacks (0/undefined = unlimited).
+     *   Restocking an item already present never counts against this limit.
      */
-    constructor(initial = [], registry = null) {
+    constructor(initial = [], registry = null, maxSlots = 0) {
         this.items = [];
         this.registry = registry;
+        this.maxSlots = (typeof maxSlots === 'number' && maxSlots > 0) ? Math.floor(maxSlots) : 0;
         if (Array.isArray(initial)) {
             for (const entry of initial) this.add(entry.id, entry.count);
         }
@@ -38,7 +41,7 @@ export class StorageInventory {
         return this.count(id) >= amount;
     }
 
-    /** Add items. Returns amount actually added (stack cap may clamp). */
+    /** Add items. Returns amount actually added (stack cap or full slots may clamp to 0). */
     add(id, amount = 1) {
         if (!this._known(id)) return 0;
         if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) return 0;
@@ -46,6 +49,8 @@ export class StorageInventory {
         if (addable <= 0) return 0;
         const limit = getStackLimit(id);
         const found = this.items.find(i => i.id === id);
+        // A brand-new item id is rejected once all slots are taken (existing stacks may still grow).
+        if (!found && this.maxSlots > 0 && this.items.length >= this.maxSlots) return 0;
         const current = found ? found.count : 0;
         const room = Math.max(0, limit - current);
         const actual = Math.min(room, addable);
@@ -94,9 +99,10 @@ export class StorageInventory {
     /**
      * @param {any} data
      * @param {any} [registry]
+     * @param {number} [maxSlots]
      */
-    static fromJSON(data, registry = null) {
-        const inv = new StorageInventory([], registry);
+    static fromJSON(data, registry = null, maxSlots = 0) {
+        const inv = new StorageInventory([], registry, maxSlots);
         if (Array.isArray(data)) {
             for (const entry of data) {
                 if (entry && typeof entry.id === 'string') inv.add(entry.id, entry.count);

@@ -8,7 +8,6 @@ import { StaminaSystem } from './player/stamina.ts';
 import { SurvivalSystem } from './player/survival.ts';
 import { FOOD_DEFS } from './inventory/items.js';
 import { StorageInventory } from './inventory/storage.js';
-import { PHASE1_RECIPES } from './crafting/recipes.js';
 import { NODE_TYPES, getNodeDef, yieldForHit } from './world/resources.js';
 import { WATER_SOURCES, drink as drinkFromSource } from './world/water.js';
 import { WeatherSystem } from './world/weather.js';
@@ -1026,6 +1025,9 @@ try {
     // ---- Storage boxes ----
     const boxWoodMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.9 });
     const boxDarkMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.9 });
+    // Wooden Storage Box is advertised as "Stores 12 stacks" (ITEMS_DATA.wooden_box.desc) —
+    // now actually enforced, instead of silently accepting unlimited distinct item types.
+    const WOODEN_BOX_SLOTS = 12;
     function spawnStorageBox(x, z, savedInv) {
         const g = new THREE.Group();
         const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.8), boxWoodMat);
@@ -1036,7 +1038,7 @@ try {
         g.position.set(x, y, z);
         const id = 'box_' + (++storageSeq);
         g.userData = { type: 'storage', boxId: id, radius: 0.9 };
-        const entry = { id, mesh: g, inv: StorageInventory.fromJSON(savedInv || [], ITEMS_DATA), pos: { x, y, z } };
+        const entry = { id, mesh: g, inv: StorageInventory.fromJSON(savedInv || [], ITEMS_DATA, WOODEN_BOX_SLOTS), pos: { x, y, z } };
         scene.add(g); interactables.push(g); collisionObjects.push(g);
         storageBoxes.push(entry);
         return entry;
@@ -1324,8 +1326,8 @@ try {
         if (!box) return;
         const have = getItemCount(id);
         if (have <= 0) return;
-        if (box.inv.count(id) <= 0 && box.inv.items.length >= 12) {
-            showNotification('Box is full (12 stacks)', '#e74c3c');
+        if (box.inv.count(id) <= 0 && box.inv.maxSlots > 0 && box.inv.items.length >= box.inv.maxSlots) {
+            showNotification(`Box is full (${box.inv.maxSlots} stacks)`, '#e74c3c');
             return;
         }
         const want = (amount === Infinity) ? have : Math.min(have, amount);
@@ -1684,8 +1686,11 @@ try {
                 const pos = obj.position.clone();
                 const objType = obj.userData.type;
                 // Determine actual type for respawn
+                // Phase 1 fix: hemp/berry_bush were harvestable-but-permanent (respawnObject
+                // already handles both cases fully — this list was just missing them).
                 let worldType = objType;
-                if (objType === 'tree' || objType === 'rock' || objType === 'iron' || objType === 'sulfur' || objType === 'barrel') {
+                if (objType === 'tree' || objType === 'rock' || objType === 'iron' || objType === 'sulfur'
+                    || objType === 'barrel' || objType === 'hemp' || objType === 'berry_bush') {
                     scheduleRespawn(obj, pos, worldType, null);
                 }
                 scene.remove(obj);
