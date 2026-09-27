@@ -78,13 +78,16 @@ const state = {
 };
 
 // Building Materials Database
+// Note: a 'door' tier ({name:'Wooden Door', health:200, cost:{wood:300}}) used to
+// live here too, but every placed structure — including doors — starts at tier
+// 'twig' (see placeStructure) and walks tierOrder ['twig','wood','stone','metal',
+// 'hqm']; 'door' was never assigned or read anywhere. Removed as dead data.
 const BUILDING_TIERS = {
     twig: { name: 'Twig', health: 10, color: 0xd7ccc8, cost: {} },
     wood: { name: 'Wood', health: 250, color: 0x8d6e63, cost: { wood: 300 } },
     stone: { name: 'Stone', health: 500, color: 0xb0bec5, cost: { stone: 300 } },
     metal: { name: 'Sheet Metal', health: 1000, color: 0x90a4ae, cost: { frag: 200 } },
     hqm: { name: 'Armored', health: 2000, color: 0xeceff1, cost: { hqm: 50 } },
-    door: { name: 'Wooden Door', health: 200, color: 0x5d4037, cost: { wood: 300 } }
 };
 
 const BUILDING_TYPES = {
