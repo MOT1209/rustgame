@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Rust-like open-world survival game (Three.js) — web, Android and Windows desktop",
   "author": "MOT1209",
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "prebuild": "node scripts/sync-version.mjs",

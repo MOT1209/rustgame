@@ -2,6 +2,7 @@
 // RUSTGAME — Electron shell (desktop .exe target)
 // Loads the same www/ build as web/APK. Renderer stays a plain
 // web page: no Node in the page, isolated preload only.
+// .cjs: package.json is "type": "module", so CommonJS is required.
 // ============================================================
 
 const { app, BrowserWindow, session } = require('electron');
@@ -26,7 +27,7 @@ function createWindow() {
         backgroundColor: '#0b0e14',
         icon: path.join(__dirname, 'icon.ico'),
         webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
+            preload: path.join(__dirname, 'preload.cjs'),
             contextIsolation: true,
             nodeIntegration: false,
             sandbox: true,
