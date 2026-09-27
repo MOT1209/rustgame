@@ -38,11 +38,24 @@ html = replaceOnce('index.html', html, /window\.RASHID_APP=\{[^}]*\};/, appScrip
 write('index.html', html);
 
 const pkg = JSON.parse(read('package.json'));
+let pkgDirty = false;
 if (pkg.version !== version) {
     pkg.version = version;
-    write('package.json', `${JSON.stringify(pkg, null, 2)}\n`);
+    pkgDirty = true;
     console.log(`sync-version: package.json → ${version}`);
 }
+// Electron builder identity follows the same single source (fail loud if
+// the build block is missing — never silently ship a wrong appId).
+if (!pkg.build || typeof pkg.build !== 'object') throw new Error('package.json: missing "build" block for electron-builder');
+if (pkg.build.appId !== appId) {
+    pkg.build.appId = appId;
+    pkgDirty = true;
+}
+if (pkg.build.productName !== appName) {
+    pkg.build.productName = appName;
+    pkgDirty = true;
+}
+if (pkgDirty) write('package.json', `${JSON.stringify(pkg, null, 2)}\n`);
 
 let gradle = read('android/app/build.gradle');
 const before = gradle;
