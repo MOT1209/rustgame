@@ -8,6 +8,7 @@ import { StaminaSystem } from './player/stamina.ts';
 import { SurvivalSystem } from './player/survival.ts';
 import { FOOD_DEFS } from './inventory/items.js';
 import { StorageInventory } from './inventory/storage.js';
+import { getRecipe, craft as craftRecipe } from './crafting/recipes.js';
 import { NODE_TYPES, getNodeDef, yieldForHit } from './world/resources.js';
 import { WATER_SOURCES, drink as drinkFromSource } from './world/water.js';
 import { WeatherSystem } from './world/weather.js';
@@ -117,33 +118,37 @@ const ITEMS_DATA = {
     'sewing': { name: 'Sewing Kit', category: 'items', icon: 'fa-needle', color: '#bdbdbd', rarity: 'common', desc: 'Required for advanced clothing.' },
 
     // Tools (Survival)
-    'stone_hatchet': { name: 'Stone Hatchet', category: 'tools', icon: 'fa-axe', color: '#bcaae1', rarity: 'common', recipe: { wood: 200, stone: 100 }, desc: 'Primitive tool for wood harvesting.' },
-    'stone_pickaxe': { name: 'Stone Pickaxe', category: 'tools', icon: 'fa-hammer-war', color: '#bcaae1', rarity: 'common', recipe: { wood: 200, stone: 100 }, desc: 'Slow but effective for basic mining.' },
-    'hammer': { name: 'Building Hammer', category: 'tools', icon: 'fa-hammer', color: '#1e88e5', rarity: 'common', recipe: { wood: 100 }, desc: 'Construct and upgrade your base.' },
-    'torch': { name: 'Torch', category: 'tools', icon: 'fa-fire', color: '#fb8c00', rarity: 'common', recipe: { wood: 50, lgf: 1 }, desc: 'Provides light and subtle heat.' },
+    // Note: crafting costs for every item below live in js/crafting/recipes.js
+    // (PHASE1_RECIPES) — this table is display-only metadata (name/icon/color/
+    // category/rarity/desc). Costs used to be duplicated here too, with
+    // different numbers than recipes.js; that duplication is gone now.
+    'stone_hatchet': { name: 'Stone Hatchet', category: 'tools', icon: 'fa-axe', color: '#bcaae1', rarity: 'common', desc: 'Primitive tool for wood harvesting.' },
+    'stone_pickaxe': { name: 'Stone Pickaxe', category: 'tools', icon: 'fa-hammer-war', color: '#bcaae1', rarity: 'common', desc: 'Slow but effective for basic mining.' },
+    'hammer': { name: 'Building Hammer', category: 'tools', icon: 'fa-hammer', color: '#1e88e5', rarity: 'common', desc: 'Construct and upgrade your base.' },
+    'torch': { name: 'Torch', category: 'tools', icon: 'fa-fire', color: '#fb8c00', rarity: 'common', desc: 'Provides light and subtle heat.' },
 
     // Weapons (Defense)
-    'spear': { name: 'Wooden Spear', category: 'weapons', icon: 'fa-pencil', color: '#8d6e63', rarity: 'common', recipe: { wood: 300 }, desc: 'Cheap long-range melee option.' },
-    'machete': { name: 'Machete', category: 'weapons', icon: 'fa-knife', color: '#90a4ae', rarity: 'rare', recipe: { iron: 100 }, desc: 'Standard industrial blade.' },
-    'bow': { name: 'Hunting Bow', category: 'weapons', icon: 'fa-bow-arrow', color: '#8d6e63', rarity: 'common', recipe: { wood: 200, cloth: 50 }, desc: 'Silent and deadly ranged tool.' },
-    'pistol': { name: 'Semi-Pistol', category: 'weapons', icon: 'fa-gun', color: '#546e7a', rarity: 'rare', recipe: { iron: 150, pipe: 1 }, desc: 'P250 clone. Fast firing sidearm.' },
-    'ak47': { name: 'Assault Rifle', category: 'weapons', icon: 'fa-gun', color: '#6d4c41', rarity: 'elite', recipe: { hqm: 50, wood: 200, scrap: 50, pipe: 1 }, desc: 'The king of Rust weapons. High recoil, high reward.' },
+    'spear': { name: 'Wooden Spear', category: 'weapons', icon: 'fa-pencil', color: '#8d6e63', rarity: 'common', desc: 'Cheap long-range melee option.' },
+    'machete': { name: 'Machete', category: 'weapons', icon: 'fa-knife', color: '#90a4ae', rarity: 'rare', desc: 'Standard industrial blade.' },
+    'bow': { name: 'Hunting Bow', category: 'weapons', icon: 'fa-bow-arrow', color: '#8d6e63', rarity: 'common', desc: 'Silent and deadly ranged tool.' },
+    'pistol': { name: 'Semi-Pistol', category: 'weapons', icon: 'fa-gun', color: '#546e7a', rarity: 'rare', desc: 'P250 clone. Fast firing sidearm.' },
+    'ak47': { name: 'Assault Rifle', category: 'weapons', icon: 'fa-gun', color: '#6d4c41', rarity: 'elite', desc: 'The king of Rust weapons. High recoil, high reward.' },
 
     // Industrial
-    'furnace': { name: 'Furnace', category: 'items', icon: 'fa-fire-burner', color: '#ff7043', rarity: 'rare', recipe: { stone: 200, wood: 100, lgf: 10 }, desc: 'Smelts ores into metal/sulfur using wood.' },
-    'campfire': { name: 'Campfire', category: 'items', icon: 'fa-fire', color: '#ffab40', rarity: 'common', recipe: { wood: 100 }, desc: 'Useful for light and cooking meat.' },
+    'furnace': { name: 'Furnace', category: 'items', icon: 'fa-fire-burner', color: '#ff7043', rarity: 'rare', desc: 'Smelts ores into metal/sulfur using wood.' },
+    'campfire': { name: 'Campfire', category: 'items', icon: 'fa-fire', color: '#ffab40', rarity: 'common', desc: 'Useful for light and cooking meat.' },
 
     // Construction
-    'building_plan': { name: 'Building Plan', category: 'tools', icon: 'fa-scroll', color: '#64b5f6', rarity: 'common', recipe: { wood: 20 }, desc: 'Select building pieces to place.' },
-    'door': { name: 'Wood Door', category: 'construction', icon: 'fa-door-closed', color: '#8d6e63', rarity: 'common', recipe: { wood: 300 }, desc: 'Access point with minimal security.' },
-    'lock': { name: 'Key Lock', category: 'construction', icon: 'fa-lock', color: '#546e7a', rarity: 'common', recipe: { iron: 100 }, desc: 'Basic protection for your base.' },
+    'building_plan': { name: 'Building Plan', category: 'tools', icon: 'fa-scroll', color: '#64b5f6', rarity: 'common', desc: 'Select building pieces to place.' },
+    'door': { name: 'Wood Door', category: 'construction', icon: 'fa-door-closed', color: '#8d6e63', rarity: 'common', desc: 'Access point with minimal security.' },
+    'lock': { name: 'Key Lock', category: 'construction', icon: 'fa-lock', color: '#546e7a', rarity: 'common', desc: 'Basic protection for your base.' },
 
     // Medical
-    'bandage': { name: 'Bandage', category: 'medical', icon: 'fa-band-aid', color: '#e57373', rarity: 'common', recipe: { cloth: 2 }, desc: 'Stops bleeding immediately.' },
-    'syringe': { name: 'Medical Syringe', category: 'medical', icon: 'fa-syringe', color: '#ef5350', rarity: 'rare', recipe: { iron: 20, scrap: 5, cloth: 10 }, desc: 'Instant adrenaline-boosted recovery.' },
-    'wooden_door': { name: 'Wooden Door', category: 'construction', icon: 'fa-door-closed', color: '#5d4037', rarity: 'common', recipe: { wood: 300 }, desc: 'Fits into doorways.' },
-    'codelock': { name: 'Code Lock', category: 'items', icon: 'fa-calculator', color: '#78909c', rarity: 'rare', recipe: { frag: 100 }, desc: 'Secure your doors with a 4-digit code.' },
-    'wooden_box': { name: 'Wooden Storage Box', category: 'survival', icon: 'fa-box-archive', color: '#a1887f', rarity: 'common', recipe: { wood: 150 }, desc: 'Placeable container. Stores 12 stacks. Press E near ground to place.' }
+    'bandage': { name: 'Bandage', category: 'medical', icon: 'fa-band-aid', color: '#e57373', rarity: 'common', desc: 'Stops bleeding immediately.' },
+    'syringe': { name: 'Medical Syringe', category: 'medical', icon: 'fa-syringe', color: '#ef5350', rarity: 'rare', desc: 'Instant adrenaline-boosted recovery.' },
+    'wooden_door': { name: 'Wooden Door', category: 'construction', icon: 'fa-door-closed', color: '#5d4037', rarity: 'common', desc: 'Fits into doorways.' },
+    'codelock': { name: 'Code Lock', category: 'items', icon: 'fa-calculator', color: '#78909c', rarity: 'rare', desc: 'Secure your doors with a 4-digit code.' },
+    'wooden_box': { name: 'Wooden Storage Box', category: 'survival', icon: 'fa-box-archive', color: '#a1887f', rarity: 'common', desc: 'Placeable container. Stores 12 stacks. Press E near ground to place.' }
 };
 
 // Phase 1: merge food/consumable defs (spoil-ready model) into the item registry.
@@ -268,6 +273,16 @@ function consumeItem(id, count) {
     removeItem(id, count);
     return true;
 }
+
+// Adapter so craft()/missingFor() from js/crafting/recipes.js can operate on
+// state.inventory without knowing its array-of-{id,count} shape.
+const craftingInventoryAdapter = {
+    has: (id, n) => getItemCount(id) >= n,
+    count: (id) => getItemCount(id),
+    consume: (id, n) => consumeItem(id, n),
+    remove: (id, n) => removeItem(id, n),
+    add: (id, n) => addItem(id, n),
+};
 
 // Phase 1: use a consumable (food/medical) from the inventory.
 function useConsumable(id) {
@@ -1710,7 +1725,7 @@ try {
         grid.innerHTML = '';
         Object.keys(ITEMS_DATA).forEach(id => {
             const item = ITEMS_DATA[id];
-            if (!item.recipe) return;
+            if (!getRecipe(id)) return;
             const matchCat = state.selectedCategory === 'common' || item.category === state.selectedCategory;
             const matchSearch = item.name.toLowerCase().includes(searchTerm);
             if (matchCat && matchSearch) {
@@ -1726,9 +1741,10 @@ try {
     function showCraftingDetail(id) {
         const panel = document.getElementById('crafting-detail-panel');
         const item = ITEMS_DATA[id];
-        if (!panel || !item) return;
+        const recipe = getRecipe(id);
+        if (!panel || !item || !recipe) return;
         let costHTML = ''; let canCraft = true;
-        Object.entries(item.recipe).forEach(([res, amt]) => {
+        Object.entries(recipe.ingredients).forEach(([res, amt]) => {
             const needed = amt * state.craftQty; const have = getItemCount(res); const missing = have < needed;
             if (missing) canCraft = false;
             costHTML += `<div class="cost-item ${missing ? 'missing' : ''}"><span>${needed}</span><span>${ITEMS_DATA[res]?.name || res}</span><span>${needed}</span><span>${have}</span></div>`;
@@ -1816,23 +1832,19 @@ try {
 
     window.updateCraftQty = (val) => { state.craftQty = Math.max(1, state.craftQty + val); if (state.selectedItem) showCraftingDetail(state.selectedItem); };
     window.performCraft = (id) => {
-        // Phase 1 (§28): validate BEFORE deducting — inventory can never go negative.
+        // Validate-then-consume-then-grant (all-or-nothing) lives in
+        // js/crafting/recipes.js craft() — inventory can never go negative.
         const item = ITEMS_DATA[id];
-        if (!item || !item.recipe) return;
+        const recipe = getRecipe(id);
+        if (!item || !recipe) return;
         const qty = Math.max(1, state.craftQty || 1);
-        const missing = [];
-        for (const [res, amt] of Object.entries(item.recipe)) {
-            const needed = amt * qty;
-            if (getItemCount(res) < needed) missing.push(`${needed - getItemCount(res)}× ${ITEMS_DATA[res]?.name || res}`);
-        }
-        if (missing.length > 0) {
+        const result = craftRecipe(recipe, craftingInventoryAdapter, qty);
+        if (!result.ok) {
+            const missing = Object.entries(result.missing)
+                .map(([res, need]) => `${need}× ${ITEMS_DATA[res]?.name || res}`);
             showNotification(`Missing: ${missing.join(', ')}`, '#e74c3c');
             return;
         }
-        for (const [res, amt] of Object.entries(item.recipe)) {
-            removeItem(res, amt * qty);
-        }
-        addItem(id, qty);
         showNotification(`Crafted: ${item.name}`, '#2ecc71');
         SoundFX.build();
         updateHUD(); showCraftingDetail(id);
