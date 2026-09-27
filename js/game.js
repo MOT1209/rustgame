@@ -9,14 +9,14 @@ import { SurvivalSystem } from './player/survival.ts';
 import { FOOD_DEFS } from './inventory/items.js';
 import { StorageInventory } from './inventory/storage.js';
 import { getRecipe, craft as craftRecipe } from './crafting/recipes.js';
-import { NODE_TYPES, getNodeDef, yieldForHit } from './world/resources.js';
+import { getNodeDef, yieldForHit } from './world/resources.js';
 import { WATER_SOURCES, drink as drinkFromSource } from './world/water.js';
 import { WeatherSystem } from './world/weather.js';
 import { DayNight } from './world/day-night.js';
 import { InteractionSystem, InteractKinds } from './interaction/interaction.js';
 import { SaveSystem } from './save/save-system.ts';
 import { detectRuntime, loadMode, resolveDevice, saveMode } from './core/platform.ts';
-import { InputSystem, Actions, keyboardProvider, touchProvider, gamepadProvider } from './input/input.js';
+import { InputSystem, gamepadProvider } from './input/input.js';
 import { UnifiedGameControls } from './input/touch-controls.js';
 import { updateSurvivalHud, setPrompt } from './ui/hud.js';
 
@@ -139,8 +139,11 @@ const ITEMS_DATA = {
     'campfire': { name: 'Campfire', category: 'items', icon: 'fa-fire', color: '#ffab40', rarity: 'common', desc: 'Useful for light and cooking meat.' },
 
     // Construction
+    // Note: 'door' (a separate craftable item, same recipe/desc as wooden_door
+    // below) was dead weight — only the 'wooden_door' item id is ever placed
+    // by the building system (BUILDING_TYPES.wooden_door / canBuildHere). It
+    // was removed rather than kept as a confusing duplicate.
     'building_plan': { name: 'Building Plan', category: 'tools', icon: 'fa-scroll', color: '#64b5f6', rarity: 'common', desc: 'Select building pieces to place.' },
-    'door': { name: 'Wood Door', category: 'construction', icon: 'fa-door-closed', color: '#8d6e63', rarity: 'common', desc: 'Access point with minimal security.' },
     'lock': { name: 'Key Lock', category: 'construction', icon: 'fa-lock', color: '#546e7a', rarity: 'common', desc: 'Basic protection for your base.' },
 
     // Medical

@@ -99,13 +99,6 @@ export const PHASE1_RECIPES = {
         craftTime: 2, workbenchRequired: false,
         desc: 'Select building pieces to place.',
     },
-    door: {
-        id: 'door', name: 'Wood Door', category: 'construction',
-        ingredients: { wood: 300 },
-        result: { id: 'door', count: 1 },
-        craftTime: 6, workbenchRequired: false,
-        desc: 'Access point with minimal security.',
-    },
     lock: {
         id: 'lock', name: 'Key Lock', category: 'construction',
         ingredients: { iron: 100 },
