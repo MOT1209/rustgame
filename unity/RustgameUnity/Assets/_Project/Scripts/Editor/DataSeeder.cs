@@ -7,6 +7,7 @@ using Rustgame.Inventory;
 using Rustgame.Crafting;
 using Rustgame.World;
 using Rustgame.Building;
+using Rustgame.Combat;
 
 namespace Rustgame.EditorTools
 {
@@ -28,6 +29,7 @@ namespace Rustgame.EditorTools
         const string WorldDir = "Assets/_Project/Data/World";
         const string BuildingsDir = "Assets/_Project/Data/Buildings";
         const string SurvivalDir = "Assets/_Project/Data/Survival";
+        const string CombatDir = "Assets/_Project/Data/Combat";
 
         [MenuItem("Rustgame/Import Seed Data")]
         public static void ImportAll()
@@ -39,6 +41,8 @@ namespace Rustgame.EditorTools
             var recipes = ImportRecipes();
             ImportResourceNodes();
             var tiers = ImportBuildingTiers();
+            var weatherStates = ImportWeatherStates();
+            var enemies = ImportEnemies();
 
             var itemDb = LoadOrCreate<ItemDatabase>($"{ItemsDir}/ItemDatabase.asset");
             itemDb.items = items;
@@ -58,12 +62,13 @@ namespace Rustgame.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log($"[DataSeeder] Imported {items.Count} items, {consumables.Count} consumables, " +
-                      $"{recipes.Count} recipes, {tiers.Count} building tiers, and every resource node definition.");
+                      $"{recipes.Count} recipes, {tiers.Count} building tiers, {weatherStates.Count} weather states, " +
+                      $"{enemies.Count} enemy definitions, and every resource node definition.");
         }
 
         static void EnsureFolders()
         {
-            foreach (var dir in new[] { ItemsDir, RecipesDir, WorldDir, BuildingsDir, SurvivalDir })
+            foreach (var dir in new[] { ItemsDir, RecipesDir, WorldDir, BuildingsDir, SurvivalDir, CombatDir })
                 if (!AssetDatabase.IsValidFolder(dir))
                     Directory.CreateDirectory(dir);
             AssetDatabase.Refresh();
@@ -168,6 +173,49 @@ namespace Rustgame.EditorTools
             return result;
         }
 
+        static List<WeatherDefinition> ImportWeatherStates()
+        {
+            var seed = ReadSeedJson<WeatherSeedFile>("weather_states.json");
+            var result = new List<WeatherDefinition>();
+            foreach (var e in seed.states)
+            {
+                var asset = LoadOrCreate<WeatherDefinition>($"{WorldDir}/Weather_{e.id}.asset");
+                asset.id = e.id;
+                asset.displayName = e.displayName;
+                asset.tempMod = e.tempMod;
+                asset.lightMod = e.lightMod;
+                asset.fogMod = e.fogMod;
+                asset.weight = e.weight;
+                EditorUtility.SetDirty(asset);
+                result.Add(asset);
+            }
+            return result;
+        }
+
+        static List<EnemyDefinition> ImportEnemies()
+        {
+            var seed = ReadSeedJson<EnemySeedFile>("enemies.json");
+            var result = new List<EnemyDefinition>();
+            foreach (var e in seed.enemies)
+            {
+                var asset = LoadOrCreate<EnemyDefinition>($"{CombatDir}/Enemy_{e.enemyType}.asset");
+                asset.enemyType = e.enemyType;
+                asset.maxHealth = e.maxHealth;
+                asset.damage = e.damage;
+                asset.agroRange = e.agroRange;
+                asset.attackRange = e.attackRange;
+                asset.attackCooldownSeconds = e.attackCooldownSeconds;
+                asset.moveSpeed = e.moveSpeed;
+                asset.bleedChance = e.bleedChance;
+                asset.lootTable = new List<ItemStack>();
+                foreach (var loot in e.lootTable)
+                    asset.lootTable.Add(new ItemStack(loot.itemId, loot.count));
+                EditorUtility.SetDirty(asset);
+                result.Add(asset);
+            }
+            return result;
+        }
+
         static Color ParseHexColor(string hex)
         {
             return ColorUtility.TryParseHtmlString(hex, out var c) ? c : Color.white;
@@ -207,5 +255,11 @@ namespace Rustgame.EditorTools
 
         [Serializable] class BuildingTierSeedEntry { public string tier, colorHex; public int maxHealth; public List<IngredientEntry> upgradeCost; }
         [Serializable] class BuildingTierSeedFile { public int toolCupboardRadius; public List<BuildingTierSeedEntry> tiers; }
+
+        [Serializable] class WeatherSeedEntry { public string id, displayName; public float tempMod, lightMod, fogMod; public int weight; }
+        [Serializable] class WeatherSeedFile { public List<WeatherSeedEntry> states; public float minDuration, maxDuration; }
+
+        [Serializable] class EnemySeedEntry { public string enemyType; public float maxHealth, damage, agroRange, attackRange, attackCooldownSeconds, moveSpeed, bleedChance; public List<IngredientEntry> lootTable; }
+        [Serializable] class EnemySeedFile { public List<EnemySeedEntry> enemies; }
     }
 }

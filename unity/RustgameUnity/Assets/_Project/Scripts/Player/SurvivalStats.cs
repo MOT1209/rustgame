@@ -40,6 +40,16 @@ namespace Rustgame.Player
 
         void Awake()
         {
+            if (config != null) Initialize(config);
+        }
+
+        /// <summary>Assign the config and reset to its starting values. Called
+        /// automatically from Awake when config is set in the Inspector;
+        /// exposed publicly so EditMode tests (and runtime spawners) can
+        /// configure a freshly-added component directly.</summary>
+        public void Initialize(SurvivalConfigSO cfg)
+        {
+            config = cfg;
             Health = MaxHealth = config.maxHealth;
             Hunger = config.hungerStart;
             Thirst = config.thirstStart;

@@ -1,0 +1,13 @@
+{
+  "states": [
+    { "id": "clear", "displayName": "Clear", "tempMod": 0, "lightMod": 1.0, "fogMod": 1.0, "weight": 60 },
+    { "id": "cloudy", "displayName": "Cloudy", "tempMod": -2, "lightMod": 0.8, "fogMod": 1.2, "weight": 25 },
+    { "id": "rain", "displayName": "Rain", "tempMod": -6, "lightMod": 0.6, "fogMod": 1.6, "weight": 15 },
+    { "id": "storm", "displayName": "Storm", "tempMod": -8, "lightMod": 0.45, "fogMod": 2.0, "weight": 0 }
+  ],
+  "minDuration": 90,
+  "maxDuration": 240,
+  "notes": [
+    "storm has weight 0 in the original (defined but disabled by default) — kept that way here, not enabled as a 'nice to have' change."
+  ]
+}

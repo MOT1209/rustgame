@@ -149,16 +149,16 @@
       كل رقم هنا مأخوذ حرفيًا من الكود المصدري — لا تخمين ولا أرقام تقريبية.
     </p>
     <div class="badges">
-      <span class="badge ok">✅ لعبة الويب (JS) — قابلة للعب، 78/78 اختبار أخضر</span>
-      <span class="badge pending">🟡 منفذ Unity — أساس مكتوب، لم يُفتح في Unity Editor بعد</span>
-      <span class="badge warn">⚠️ 0 مشاهد/UI/اختبارات في Unity حتى الآن</span>
+      <span class="badge ok">✅ لعبة الويب (JS) — قابلة للعب، 83/83 اختبار أخضر</span>
+      <span class="badge pending">🟡 منفذ Unity — كل الأنظمة الـ15 لها أساس، لم يُفتح في Unity Editor بعد</span>
+      <span class="badge warn">⚠️ لا يوجد geometry فعلي للمستوى ولا NavMesh مبني بعد</span>
     </div>
 
     <div class="stat-grid">
       <div class="stat"><div class="n">2797</div><div class="l">سطر في js/game.js</div></div>
-      <div class="stat"><div class="n">78 / 78</div><div class="l">اختبار Vitest أخضر</div></div>
-      <div class="stat"><div class="n">31</div><div class="l">ملف C# مكتوب لـ Unity</div></div>
-      <div class="stat"><div class="n">9 / 15</div><div class="l">أنظمة لها أساس في Unity</div></div>
+      <div class="stat"><div class="n">83 / 83</div><div class="l">اختبار Vitest أخضر</div></div>
+      <div class="stat"><div class="n">53</div><div class="l">ملف C# مكتوب لـ Unity</div></div>
+      <div class="stat"><div class="n">15 / 15</div><div class="l">أنظمة لها أساس في Unity</div></div>
     </div>
   </section>
 
@@ -336,14 +336,14 @@
 
   <section id="systems">
     <h2>3. حالة الأنظمة (System Status Board)</h2>
-    <p class="lead">15 نظامًا من الخطة الأصلية. الحالة تعكس ما هو مكتوب فعليًا كملفات C#، وليس ما هو "مخطَّط له" فقط.</p>
+    <p class="lead">15 نظامًا من الخطة الأصلية. <b>كل الـ15 لها الآن أساس C# مكتوب</b> (53 ملفًا إجمالًا) — الحالة تعكس ما هو مكتوب فعليًا، وليس ما هو "مخطَّط له" فقط. لم يُفتح أي منها في Unity Editor حقيقي بعد.</p>
     <div class="sys-grid">
 
       <div class="sys-card"><h4>Core <span class="status done">✅ مبني</span></h4>
         <ul><li>GameEvents (event bus)</li><li>ServiceLocator</li><li>GameManager (boot sequence)</li></ul></div>
 
       <div class="sys-card"><h4>طبقة البيانات <span class="status done">✅ مبني</span></h4>
-        <ul><li>7 أنواع ScriptableObject</li><li>5 ملفات JSON seed</li><li>Editor importer آلي</li></ul></div>
+        <ul><li>9 أنواع ScriptableObject</li><li>7 ملفات JSON seed</li><li>Editor importer آلي (~85 asset)</li></ul></div>
 
       <div class="sys-card"><h4>Inventory <span class="status done">✅ مبني</span></h4>
         <ul><li>InventorySystem (منقول من StorageInventory)</li><li>maxSlots مُفعَّل</li></ul></div>
@@ -354,57 +354,60 @@
       <div class="sys-card"><h4>Survival <span class="status done">✅ مبني</span></h4>
         <ul><li>SurvivalStats.Tick() طبق الأصل</li><li>StaminaSystem + DamageSystem</li></ul></div>
 
-      <div class="sys-card"><h4>Player <span class="status partial">🟡 جزئي</span></h4>
-        <ul><li>PlayerController (حركة+قفز+جري)</li><li>لا يوجد PlayerInput/Actions asset بعد</li></ul></div>
+      <div class="sys-card"><h4>Player <span class="status done">✅ مبني</span></h4>
+        <ul><li>PlayerController (حركة+قفز+جري)</li><li>PlayerInputReader مربوط بـ Input Actions</li></ul></div>
 
       <div class="sys-card"><h4>Interaction <span class="status partial">🟡 جزئي</span></h4>
         <ul><li>IInteractable + Controller</li><li>ResourceNode, StorageBox, Campfire</li><li>لا يوجد Door/Loot كاملَين بعد</li></ul></div>
 
       <div class="sys-card"><h4>Building <span class="status partial">🟡 جزئي</span></h4>
-        <ul><li>BuildingInstance + Upgrade/Repair</li><li>لا يوجد BuildingPlacer/Ghost (وضع فعلي)</li></ul></div>
+        <ul><li>BuildingInstance + Upgrade/Repair</li><li>لا يوجد BuildingPlacer/Ghost (وضع فعلي) بعد</li></ul></div>
 
       <div class="sys-card"><h4>Save <span class="status done">✅ مبني</span></h4>
         <ul><li>SaveData (شكل v3 مطابق)</li><li>SaveManager (A/B slots)</li><li>AutoSaveTimer</li></ul></div>
 
-      <div class="sys-card"><h4>World / Time-Weather <span class="status todo">⬜ لم يبدأ</span></h4>
-        <ul><li>لا TimeSystem</li><li>لا WeatherSystem</li><li>لا توليد عالم</li></ul></div>
+      <div class="sys-card"><h4>World / Time-Weather <span class="status done">✅ مبني</span></h4>
+        <ul><li>TimeSystem (يوم 800 ثانية، مراحل مطابقة)</li><li>WeatherSystem (4 حالات، اختيار عشوائي موزون)</li></ul></div>
 
-      <div class="sys-card"><h4>UI / HUD <span class="status todo">⬜ لم يبدأ</span></h4>
-        <ul><li>لا Canvas ولا Views</li></ul></div>
+      <div class="sys-card"><h4>UI / HUD <span class="status done">✅ مبني (منطق)</span></h4>
+        <ul><li>HUDController, Inventory/Crafting/BuildMenu controllers</li><li>Canvas تُبنى عبر SceneBootstrapper</li></ul></div>
 
-      <div class="sys-card"><h4>Input (Mobile+PC) <span class="status todo">⬜ لم يبدأ</span></h4>
-        <ul><li>لا Input Actions asset</li><li>لا تحكم لمس</li></ul></div>
+      <div class="sys-card"><h4>Input (Mobile+PC) <span class="status done">✅ مبني</span></h4>
+        <ul><li>RustgameControls.inputactions (Desktop+Touch)</li><li>TouchInputAdapter</li></ul></div>
 
-      <div class="sys-card"><h4>Scenes / Prefabs <span class="status todo">⬜ لم يبدأ</span></h4>
-        <ul><li>لا يوجد مشهد واحد بعد</li></ul></div>
+      <div class="sys-card"><h4>Scenes / Prefabs <span class="status done">✅ مبني (Editor script)</span></h4>
+        <ul><li>SceneBootstrapper: يبني World.unity + Player.prefab برمجيًا</li><li>لا يوجد geometry فعلي للمستوى بعد</li></ul></div>
 
-      <div class="sys-card"><h4>Testing <span class="status todo">⬜ لم يبدأ</span></h4>
-        <ul><li>لا EditMode/PlayMode tests</li></ul></div>
+      <div class="sys-card"><h4>Testing <span class="status done">✅ مبني</span></h4>
+        <ul><li>6 ملفات EditMode tests (NUnit)</li><li>لم تُشغَّل فعليًا بمُصرِّف حقيقي بعد</li></ul></div>
 
-      <div class="sys-card"><h4>Combat / NPCs <span class="status todo">⬜ لم يبدأ (Phase 2 أصلًا)</span></h4>
-        <ul><li>نموذج game.js الأصلي (wolf/bear/scientist) مرجع سلوكي جيد لاحقًا</li></ul></div>
+      <div class="sys-card"><h4>Combat / NPCs <span class="status done">✅ مبني</span></h4>
+        <ul><li>EnemyDefinition + EnemyAI (wolf/bear/scientist، أرقام مُتحقَّقة)</li><li>NavMeshAgent حقيقي بدل الحركة الخطية الأصلية (تحسين متعمَّد)</li></ul></div>
 
+    </div>
+    <div class="callout info">
+      <strong>ملاحظة:</strong> "Scenes/Prefabs" لا يمكن تأليفها يدويًا كملفات <code>.unity</code>/<code>.prefab</code> بصيغة YAML موثوقة من هنا (تعتمد على GUIDs يُصدرها Unity وقت الاستيراد الفعلي). الحل: سكربت Editor (<code>SceneBootstrapper.cs</code>) يبنيها برمجيًا عند تشغيله داخل Unity — نفس أسلوب <code>DataSeeder.cs</code>.
     </div>
   </section>
 
   <section id="roadmap">
     <h2>4. خارطة الطريق القادمة</h2>
-    <p class="lead">الأساس (طبقة البيانات + الأنظمة الجوهرية) مبني. المراحل التالية تحوّله من "كود مجمَّع" إلى "لعبة قابلة للتشغيل فعليًا".</p>
+    <p class="lead">الأساس مبني بالكامل لكل الأنظمة الـ15 الآن (53 ملف C#). المراحل التالية تحوّله من "كود مكتوب" إلى "لعبة قابلة للتشغيل فعليًا" — معظمها الآن تحقّق وربط، وليس كتابة من الصفر.</p>
 
     <div class="phase">
       <div class="ph-badge">A</div>
       <div class="ph-body">
         <h4>أول فتح فعلي + إصلاح أخطاء Compile</h4>
-        <p>فتح <span class="path">unity/RustgameUnity/</span> في Unity Editor، تشغيل <code>Rustgame → Import Seed Data</code>، إصلاح أي خطأ compile يظهر (متوقّع بنسبة معقولة لأن الكود لم يُصرَّف من قبل).</p>
-        <div class="accept">معيار القبول: المشروع يُفتح بلا أخطاء Console حمراء، و~70 asset بيانات تُنشأ بنجاح.</div>
+        <p>فتح <span class="path">unity/RustgameUnity/</span> في Unity Editor، تشغيل <code>Rustgame → Import Seed Data</code> ثم <code>Rustgame → Build Bootstrap Scene</code>، إصلاح أي خطأ compile يظهر (متوقّع بنسبة معقولة لأن الكود لم يُصرَّف من قبل — 53 ملفًا الآن، ليس 31).</p>
+        <div class="accept">معيار القبول: المشروع يُفتح بلا أخطاء Console حمراء، ~85 asset بيانات تُنشأ، وWorld.unity + Player.prefab يُبنيان بنجاح.</div>
       </div>
     </div>
 
     <div class="phase">
       <div class="ph-badge">B</div>
       <div class="ph-body">
-        <h4>مشهد أولي + Player Prefab + دمج الأنظمة</h4>
-        <p>مشهد World.unity بسيط (أرضية + إضاءة)، Player Prefab يجمع CharacterController+PlayerController+SurvivalStats+InteractionController، وربط GameManager بكل شيء فعليًا (CollectSaveData الحالية placeholder فقط).</p>
+        <h4>التحقق من Player + دمج الأنظمة (مكتوب، يحتاج اختبارًا حيًا)</h4>
+        <p>SceneBootstrapper يبني الآن Player Prefab (CharacterController+PlayerController+SurvivalStats+InteractionController+PlayerInputReader) تلقائيًا. المتبقي: التحقق الفعلي في Play Mode وربط GameManager.CollectSaveData() بالأنظمة الحية بدل الـ placeholder الحالي.</p>
         <div class="accept">معيار القبول: يمكن الحركة والقفز والجري داخل Play Mode، وHunger/Stamina تنخفض حيًا.</div>
       </div>
     </div>
@@ -412,8 +415,8 @@
     <div class="phase">
       <div class="ph-badge">C</div>
       <div class="ph-body">
-        <h4>Input Actions Asset + HUD أساسي</h4>
-        <p>Action Maps (Desktop + Touch) عبر Input System Package، وCanvas UGUI بأشرطة Health/Hunger/Thirst/Stamina/Temperature + حزام 1-6.</p>
+        <h4>Input Actions + HUD (مكتوبان، يحتاجان تحققًا)</h4>
+        <p><code>RustgameControls.inputactions</code> (Desktop+Touch) وCanvas HUD أساسي (أشرطة + prompt + إشعار حفظ) يُبنيان الآن آليًا عبر SceneBootstrapper. المتبقي: التحقق أن كل الربط الفعلي (SerializedObject wiring) يعمل صحيحًا داخل الـ Inspector، وتحسين تصميم HUD بصريًا.</p>
         <div class="accept">معيار القبول: كل مدخل (WASD/Space/Shift/E) يعمل عبر Input Actions لا Input.GetKey مباشرة، والـ HUD يتحدّث حيًا.</div>
       </div>
     </div>
@@ -421,26 +424,26 @@
     <div class="phase">
       <div class="ph-badge">D</div>
       <div class="ph-body">
-        <h4>BuildingPlacer/Ghost + عالم بسيط</h4>
-        <p>وضع بناء فعلي (شبح شفاف + snap-to-grid + فحص تصادم)، وتوليد عدد من ResourceNode في مشهد اختباري بدل placeholder واحد.</p>
-        <div class="accept">معيار القبول: وضع جدار Twig وترقيته إلى Wood يعمل من البداية للنهاية.</div>
+        <h4>BuildingPlacer/Ghost + عالم فعلي</h4>
+        <p>لا يزال يحتاج بناءً فعليًا: وضع بناء تفاعلي (شبح شفاف + snap-to-grid + فحص تصادم) — البيانات (BuildingTierDefinition/BuildingInstance) جاهزة لكن أداة الوضع نفسها غير مكتوبة بعد. أيضًا: geometry فعلي للمستوى بدل الأرض المسطحة، وNavMesh bake (خطوة يدوية) لتفعيل EnemyAI.</p>
+        <div class="accept">معيار القبول: وضع جدار Twig وترقيته إلى Wood يعمل من البداية للنهاية، ووحش يطارد اللاعب عبر NavMesh حقيقي.</div>
       </div>
     </div>
 
     <div class="phase">
       <div class="ph-badge">E</div>
       <div class="ph-body">
-        <h4>اختبارات + أداء موبايل + Android Build</h4>
-        <p>EditMode tests لـ CraftingSystem/InventorySystem/SurvivalStats (توازي <code>tests/phase1.test.mjs</code>)، وضبط IL2CPP+ARM64، وبناء APK أول تجريبي.</p>
-        <div class="accept">معيار القبول: كل الاختبارات خضراء، وAPK يُثبَّت ويعمل على جهاز حقيقي.</div>
+        <h4>تشغيل الاختبارات + أداء موبايل + Android Build</h4>
+        <p>6 ملفات EditMode tests مكتوبة بالفعل (تغطي Crafting/Inventory/Survival/Building/Save/Gathering، توازي <code>tests/phase1.test.mjs</code>) — لم تُشغَّل بمُصرِّف حقيقي بعد. المتبقي: تشغيلها فعليًا وإصلاح ما يظهر، ثم ضبط IL2CPP+ARM64 وبناء APK أول تجريبي.</p>
+        <div class="accept">معيار القبول: كل الاختبارات خضراء فعليًا (لا نظريًا)، وAPK يُثبَّت ويعمل على جهاز حقيقي.</div>
       </div>
     </div>
 
     <div class="phase">
       <div class="ph-badge">F</div>
       <div class="ph-body">
-        <h4>Combat / NPCs (Phase 2)</h4>
-        <p>استخدام نموذج <code>NPC</code> الأصلي في game.js (ذئب/دب/عالِم) كمرجع سلوكي، لكن مع NavMesh حقيقي بدل الحركة الخطية المباشرة.</p>
+        <h4>Combat / NPCs (Phase 2) — مكتوب، يحتاج مستوى فعليًا لاختباره</h4>
+        <p><code>EnemyDefinition</code> + <code>EnemyAI</code> مكتوبان بأرقام wolf/bear/scientist المُتحقَّقة من <code>game.js</code> بالضبط، باستخدام <code>NavMeshAgent</code> حقيقي بدل الحركة الخطية المباشرة (تحسين متعمَّد). المتبقي: مستوى فعلي بـ NavMesh مبني، وربط <code>LootDropper</code> عند الموت.</p>
         <div class="accept">معيار القبول: مواجهة ذئب قابلة للربح بالأدوات الحجرية (نفس معيار PRD الأصلي).</div>
       </div>
     </div>

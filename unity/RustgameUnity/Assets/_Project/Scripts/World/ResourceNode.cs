@@ -24,6 +24,15 @@ namespace Rustgame.World
         public InteractionKind Kind => InteractionKind.Gather;
         public ResourceNodeDefinition Definition => definition;
 
+        /// <summary>Assign the definition and reset health. Called automatically
+        /// from Awake when definition is set in the Inspector; exposed publicly
+        /// for procedural spawning and EditMode tests.</summary>
+        public void Configure(ResourceNodeDefinition def)
+        {
+            definition = def;
+            currentHealth = definition != null ? definition.nodeHealth : 1;
+        }
+
         void Awake()
         {
             currentHealth = definition != null ? definition.nodeHealth : 1;
