@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RUSTGAME — خطة تطوير Unity</title>
+<meta name="description" content="مراجعة شاملة للعبة RUSTGAME وخطة تطوير كاملة لإعادة بنائها في محرك Unity.">
+<style>
+  :root{
+    --bg:#f7f6f3; --bg-elev:#ffffff; --text:#1c1a17; --text-dim:#5b564e;
+    --border:#e4e0d8; --accent:#b0501f; --accent-2:#2f6b4f; --accent-3:#2a5d8c;
+    --warn:#a4460a; --danger:#b0261f; --ok:#1f7a45; --pending:#8a6d1f;
+    --code-bg:#efece4; --shadow:0 1px 2px rgba(20,16,8,.06), 0 8px 24px rgba(20,16,8,.05);
+    --radius:12px; --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,"Noto Sans Arabic",Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"Cascadia Code","Fira Code",Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#15130f; --bg-elev:#1d1a15; --text:#efeae1; --text-dim:#a89e8d;
+      --border:#332e25; --accent:#e08a4f; --accent-2:#5fbf8f; --accent-3:#6fa8d8;
+      --warn:#e0a24f; --danger:#e0645a; --ok:#5fbf8f; --pending:#d8b95f;
+      --code-bg:#241f18; --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#15130f; --bg-elev:#1d1a15; --text:#efeae1; --text-dim:#a89e8d;
+    --border:#332e25; --accent:#e08a4f; --accent-2:#5fbf8f; --accent-3:#6fa8d8;
+    --warn:#e0a24f; --danger:#e0645a; --ok:#5fbf8f; --pending:#d8b95f;
+    --code-bg:#241f18; --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.7}
+  body{font-size:16px;padding-bottom:80px}
+  a{color:var(--accent-3)}
+  code,.mono{font-family:var(--mono);direction:ltr;unicode-bidi:isolate}
+  code{background:var(--code-bg);padding:.1em .4em;border-radius:5px;font-size:.9em}
+  h1,h2,h3,h4{line-height:1.3;font-weight:800;letter-spacing:-.01em}
+  h1{font-size:1.9rem;margin:0 0 .3rem}
+  h2{font-size:1.5rem;margin:0 0 1rem;padding-top:2px}
+  h3{font-size:1.15rem;margin:1.6rem 0 .6rem}
+  h4{font-size:1rem;margin:1rem 0 .4rem;color:var(--text-dim)}
+  p{margin:.5rem 0}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+  /* ---- top bar ---- */
+  header.top{position:sticky;top:0;z-index:50;background:color-mix(in srgb, var(--bg) 88%, transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+  .topbar-inner{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px;max-width:1080px;margin:0 auto}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:.95rem;white-space:nowrap}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent)}
+  nav.toc{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1;justify-content:flex-end}
+  nav.toc::-webkit-scrollbar{display:none}
+  nav.toc a{white-space:nowrap;font-size:.82rem;color:var(--text-dim);text-decoration:none;padding:8px 10px;border-radius:8px;font-weight:600}
+  nav.toc a:hover{background:var(--bg-elev);color:var(--text)}
+  .theme-btn{border:1px solid var(--border);background:var(--bg-elev);color:var(--text);border-radius:8px;padding:7px 10px;font-size:.8rem;cursor:pointer;font-weight:700;flex-shrink:0}
+
+  /* ---- hero ---- */
+  .hero{padding:44px 0 28px}
+  .hero .meta{color:var(--text-dim);font-size:.9rem;margin-bottom:14px}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 14px;font-size:.82rem;font-weight:700;border:1px solid var(--border);background:var(--bg-elev)}
+  .badge.ok{color:var(--ok);border-color:color-mix(in srgb, var(--ok) 40%, var(--border))}
+  .badge.pending{color:var(--pending);border-color:color-mix(in srgb, var(--pending) 40%, var(--border))}
+  .badge.warn{color:var(--warn);border-color:color-mix(in srgb, var(--warn) 40%, var(--border))}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:22px 0}
+  .stat{background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+  .stat .n{font-size:1.7rem;font-weight:800;font-family:var(--mono)}
+  .stat .l{font-size:.78rem;color:var(--text-dim);margin-top:2px}
+  @media (max-width:720px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+
+  section{padding:36px 0;border-top:1px solid var(--border)}
+  section:first-of-type{border-top:none}
+  .lead{color:var(--text-dim);font-size:1.02rem;max-width:70ch}
+
+  .card{background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);margin:14px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:800px){.grid2{grid-template-columns:1fr}}
+
+  table{width:100%;border-collapse:collapse;font-size:.88rem;background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  table caption{text-align:start;font-weight:700;padding:10px 14px;background:var(--code-bg);font-size:.85rem}
+  th,td{padding:9px 12px;text-align:start;border-bottom:1px solid var(--border);direction:ltr;text-align:left}
+  th{background:var(--code-bg);font-size:.76rem;text-transform:uppercase;letter-spacing:.03em;color:var(--text-dim)}
+  tr:last-child td{border-bottom:none}
+  .tbl-wrap{overflow-x:auto;margin:14px 0;border-radius:var(--radius)}
+  .num{font-family:var(--mono);text-align:right}
+
+  .status{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:700;padding:3px 10px;border-radius:999px}
+  .status.done{color:var(--ok);background:color-mix(in srgb, var(--ok) 14%, transparent)}
+  .status.partial{color:var(--pending);background:color-mix(in srgb, var(--pending) 14%, transparent)}
+  .status.todo{color:var(--text-dim);background:color-mix(in srgb, var(--text-dim) 12%, transparent)}
+
+  .sys-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media (max-width:900px){.sys-grid{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:600px){.sys-grid{grid-template-columns:1fr}}
+  .sys-card{background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+  .sys-card h4{margin:0 0 6px;color:var(--text);font-size:.95rem;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .sys-card ul{margin:8px 0 0;padding-inline-start:18px;font-size:.83rem;color:var(--text-dim)}
+  .sys-card ul li{margin:3px 0}
+
+  .fix-item{border-inline-start:3px solid var(--ok);padding:8px 14px;margin:10px 0;background:var(--bg-elev);border-radius:0 var(--radius) var(--radius) 0}
+  .fix-item.debt{border-inline-start-color:var(--warn)}
+  .fix-item b{display:block;font-size:.92rem}
+  .fix-item span{font-size:.85rem;color:var(--text-dim)}
+
+  .phase{display:flex;gap:16px;margin:16px 0;align-items:flex-start}
+  .phase .ph-badge{flex-shrink:0;width:38px;height:38px;border-radius:10px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.95rem}
+  .phase .ph-body{flex:1;background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+  .phase .ph-body h4{margin:0 0 4px;font-size:1rem;color:var(--text)}
+  .phase .ph-body .accept{font-size:.82rem;color:var(--ok);margin-top:8px;font-weight:600}
+
+  .risk-table td:first-child{font-weight:700;white-space:nowrap}
+  .callout{border:1px solid color-mix(in srgb, var(--danger) 35%, var(--border));background:color-mix(in srgb, var(--danger) 8%, var(--bg-elev));border-radius:var(--radius);padding:14px 16px;margin:16px 0;font-size:.9rem}
+  .callout.info{border-color:color-mix(in srgb, var(--accent-3) 35%, var(--border));background:color-mix(in srgb, var(--accent-3) 8%, var(--bg-elev))}
+  .callout strong{color:var(--danger)}
+  .callout.info strong{color:var(--accent-3)}
+
+  ol.steps{padding-inline-start:22px}
+  ol.steps li{margin:10px 0}
+  .path{background:var(--code-bg);border-radius:8px;padding:2px 8px;font-family:var(--mono);direction:ltr;display:inline-block}
+
+  footer{padding:30px 0 10px;color:var(--text-dim);font-size:.8rem;text-align:center}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="topbar-inner">
+    <div class="brand"><span class="dot"></span> RUSTGAME → Unity</div>
+    <nav class="toc">
+      <a href="#review">المراجعة</a>
+      <a href="#data">البيانات</a>
+      <a href="#systems">الأنظمة</a>
+      <a href="#roadmap">الخارطة</a>
+      <a href="#risks">المخاطر</a>
+      <a href="#howto">التشغيل</a>
+    </nav>
+    <button class="theme-btn" onclick="try{const r=document.documentElement;const c=r.getAttribute('data-theme')==='dark'?'light':'dark';r.setAttribute('data-theme',c);localStorage.setItem('theme',c);}catch(e){}">☾/☀</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="hero">
+    <h1>مراجعة اللعبة وخطة تطوير Unity الشاملة</h1>
+    <div class="meta">RUSTGAME — <span class="mono">MOT1209/rustgame</span> · تاريخ المراجعة: 28 سبتمبر 2026 · فرع <code>main</code></div>
+    <p class="lead">
+      وثيقة واحدة تجمع مراجعة فعلية (مبنية على قراءة كاملة لكود اللعبة) لحالة نسخة الويب الحالية،
+      وحالة أساس إعادة البناء في Unity الذي بدأ فعليًا، وخارطة طريق مفصّلة لإكماله.
+      كل رقم هنا مأخوذ حرفيًا من الكود المصدري — لا تخمين ولا أرقام تقريبية.
+    </p>
+    <div class="badges">
+      <span class="badge ok">✅ لعبة الويب (JS) — قابلة للعب، 78/78 اختبار أخضر</span>
+      <span class="badge pending">🟡 منفذ Unity — أساس مكتوب، لم يُفتح في Unity Editor بعد</span>
+      <span class="badge warn">⚠️ 0 مشاهد/UI/اختبارات في Unity حتى الآن</span>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat"><div class="n">2797</div><div class="l">سطر في js/game.js</div></div>
+      <div class="stat"><div class="n">78 / 78</div><div class="l">اختبار Vitest أخضر</div></div>
+      <div class="stat"><div class="n">31</div><div class="l">ملف C# مكتوب لـ Unity</div></div>
+      <div class="stat"><div class="n">9 / 15</div><div class="l">أنظمة لها أساس في Unity</div></div>
+    </div>
+  </section>
+
+  <section id="review">
+    <h2>1. مراجعة اللعبة (Game Review)</h2>
+    <p class="lead">نتائج مبنية على قراءة <code>js/game.js</code> كاملًا (2797 سطر) وكل وحدات Phase-1 (<code>config.ts</code>, <code>survival.ts</code>, <code>storage.js</code>, <code>recipes.js</code>, <code>resources.js</code>, <code>save-system.ts</code>) — وليست ملخّصًا من التوثيق فقط.</p>
+
+    <h3>صحة الكود الحالية</h3>
+    <div class="grid2">
+      <div class="card">
+        <b>الاختبارات والبناء</b>
+        <ul style="margin:8px 0 0;padding-inline-start:18px;font-size:.9rem">
+          <li><code>npm test</code> → 78/78 أخضر</li>
+          <li><code>npm run typecheck</code> → 0 أخطاء</li>
+          <li><code>npm run build</code> → ناجح</li>
+        </ul>
+      </div>
+      <div class="card">
+        <b>حجم الملفات الأساسية</b>
+        <ul style="margin:8px 0 0;padding-inline-start:18px;font-size:.9rem">
+          <li><code>js/game.js</code> — 2797 سطر (legacy، غير مُفكَّك بعد)</li>
+          <li><code>js/crafting/recipes.js</code> — 186 سطر (18 وصفة)</li>
+          <li><code>js/inventory/storage.js</code> — 113 سطر</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>أخطاء وُجدت وأُصلحت في هذه الجلسة</h3>
+    <div class="fix-item">
+      <b>عدم إعادة توليد القنب/التوت (hemp / berry_bush)</b>
+      <span>كانا يُحصَدان بلا رجوع أبدًا رغم أن <code>respawnObject()</code> يدعمهما بالكامل — كانا فقط مفقودَين من قائمة الأنواع المسموح لها بإعادة الجدولة. أُصلح في <code>game.js</code>، ونُقل السلوك الصحيح مباشرةً إلى Unity (<code>ResourceRespawnService.cs</code>).</span>
+    </div>
+    <div class="fix-item">
+      <b>حد "12 stack" لصندوق التخزين لم يكن مُطبَّقًا فعليًا</b>
+      <span>موجود كنص وصفي فقط. أُضيف <code>maxSlots</code> إلى <code>StorageInventory</code> نفسه (وإلى <code>InventorySystem.cs</code> في Unity)، بحيث يُفرض على مستوى البيانات لا الواجهة فقط.</span>
+    </div>
+    <div class="fix-item">
+      <b>نظام الصياغة كان معزولًا فعليًا عن الإنتاج</b>
+      <span><code>js/crafting/recipes.js</code> (المُختبر بـ 30+ اختبار) لم يكن مُستوردًا في <code>game.js</code> إطلاقًا — الصياغة الحية كانت تقرأ من <code>ITEMS_DATA[id].recipe</code> بأرقام مختلفة تمامًا. تم توسيع <code>recipes.js</code> ليطابق الأرقام الرسمية (18 وصفة) وربطه فعليًا بـ <code>game.js</code>.</span>
+    </div>
+    <div class="fix-item">
+      <b>بيانات ميتة محذوفة</b>
+      <span>عنصر <code>door</code> المكرَّر (نسخة طبق الأصل من <code>wooden_door</code>)، <code>BUILDING_TIERS.door</code> غير المُستخدَم إطلاقًا، واستيرادات JS ميتة (<code>NODE_TYPES</code>, <code>keyboardProvider</code>, <code>touchProvider</code>, <code>Actions</code>).</span>
+    </div>
+    <div class="fix-item">
+      <b>تصحيح توثيقي: نصف قطر Tool Cupboard</b>
+      <span><code>BUILDING_SYSTEM.md</code> كان يذكر 20 وحدة؛ الكود الفعلي (<code>CONFIG.TC_RADIUS</code>) يستخدم 25. صُحِّح في التوثيق ونُقل الرقم الصحيح إلى Unity.</span>
+    </div>
+
+    <h3>ديون تقنية متبقية (لم تُعالَج بعد، للعلم فقط)</h3>
+    <div class="fix-item debt">
+      <b>عنصر <code>codelock</code> معرَّف بلا أي منطق قفل فعلي</b>
+      <span>موجود في سجل العناصر ويظهر في قائمة الصياغة، لكن لا يوجد أي كود يربطه بباب فعليًا — الأبواب تُفتح/تُغلق بـ E فقط بلا حماية.</span>
+    </div>
+    <div class="fix-item debt">
+      <b><code>inputSys</code>/<code>gamepadProvider</code> غير مكتمل الربط</b>
+      <span>يُنشأ نظام Input System كامل ويُضاف له مزوّد gamepad، لكن لا يوجد أي استدعاء فعلي لقراءة مدخلاته في حلقة اللعب — الحركة الفعلية تمر عبر مسارات إدخال أخرى (كيبورد/لمس مباشرة).</span>
+    </div>
+    <div class="fix-item debt">
+      <b><code>js/game.js</code> لا يزال ملفًا أحاديًا ضخمًا (2797 سطر)</b>
+      <span>لم يُفكَّك تدريجيًا إلى وحدات كما توصي PRD — هذا هو بالضبط سبب اختيار إعادة البناء الكامل في Unity بدل محاولة "تفكيكه" أكثر.</span>
+    </div>
+
+    <h3>حالة أساس Unity</h3>
+    <p>9 من أصل 15 نظامًا في الخطة الأصلية لها الآن كود C# فعلي (أساسي، غير مُختبر بمُصرِّف حقيقي):
+    Core، طبقة البيانات، Inventory، Crafting، Survival، Player، Interaction، Building، Save.
+    الباقي (World/Time-Weather، UI، Input Actions asset، Mobile Controls، Testing، Combat) لم يبدأ.</p>
+    <div class="callout">
+      <strong>تنويه لا بد من تكراره:</strong> كل كود Unity كُتب في بيئة سحابية بلا Unity Editor مثبَّت. لم يُفتح، لم يُصرَّف، ولم يُشغَّل فعليًا بعد. تحقّقت فقط من توازن الأقواس في كل ملف، وصحة كل JSON، وتطابق كل المعرّفات المرجعية بين الملفات (صفر مرجع معلّق) — لكن هذا ليس بديلًا عن مُصرِّف C# حقيقي.
+    </div>
+  </section>
+
+  <section id="data">
+    <h2>2. البيانات المرجعية (مصدرها الحقيقي: JSON الفعلي في المستودع)</h2>
+    <p class="lead">الجداول التالية منقولة حرفيًا من <span class="path">unity/RustgameUnity/Assets/_Project/Data/Seed/*.json</span> — وهي نفس الأرقام المُطبَّقة فعليًا في <code>ITEMS_DATA</code>/<code>recipes.js</code>/<code>resources.js</code> بعد التوحيد.</p>
+
+    <h3>أنظمة البقاء (SurvivalConfig)</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>الفئة</th><th>القيمة</th></tr></thead>
+      <tbody>
+        <tr><td>Hunger drain (مشي / جري / برد)</td><td class="num mono">0.05 / 0.09 / 0.08 لكل ثانية</td></tr>
+        <tr><td>Thirst drain (مشي / جري)</td><td class="num mono">0.08 / 0.13 لكل ثانية</td></tr>
+        <tr><td>Stamina (جري / قفزة / جمع / تجدد)</td><td class="num mono">−12/ث, −10 ثابتة, −4 ثابتة, +9/ث</td></tr>
+        <tr><td>Temperature (نهار / ليل / مطر / نار)</td><td class="num mono">+1.2 / −0.9 / −1.6 / +6.0 لكل ثانية</td></tr>
+        <tr><td>عتبات الخطر (تجمّد / حرج)</td><td class="num mono">25 / 10</td></tr>
+        <tr><td>طول اليوم</td><td class="num mono">800 ثانية</td></tr>
+        <tr><td>الإحياء (health/hunger/thirst/stamina/temp)</td><td class="num mono">100 / 80 / 80 / 100 / 90 — دائمًا عند (0,0,0)</td></tr>
+        <tr><td>Autosave</td><td class="num mono">كل 60 ثانية</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>العناصر (37) — عيّنة الفئات الرئيسية</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>id</th><th>الاسم</th><th>الفئة</th><th>حد التكديس</th></tr></thead>
+      <tbody>
+        <tr><td>wood</td><td>Wood</td><td>Resource</td><td class="num">1000</td></tr>
+        <tr><td>stone</td><td>Stone</td><td>Resource</td><td class="num">1000</td></tr>
+        <tr><td>iron</td><td>Metal Ore</td><td>Resource</td><td class="num">500</td></tr>
+        <tr><td>sulfur</td><td>Sulfur Ore</td><td>Resource</td><td class="num">500</td></tr>
+        <tr><td>hqm</td><td>High Quality Metal</td><td>Resource</td><td class="num">100</td></tr>
+        <tr><td>frag</td><td>Metal Fragments</td><td>Resource</td><td class="num">500</td></tr>
+        <tr><td>cloth</td><td>Cloth</td><td>Resource</td><td class="num">500</td></tr>
+        <tr><td>scrap</td><td>Scrap</td><td>Item</td><td class="num">100</td></tr>
+        <tr><td>bandage</td><td>Bandage</td><td>Medical</td><td class="num">10</td></tr>
+        <tr><td>berry / raw_meat / cooked_meat / canned_food / water</td><td>—</td><td>Food</td><td class="num">20 / 10 / 10 / 10 / 10</td></tr>
+        <tr><td>باقي الأدوات/الأسلحة/عناصر البناء (26 عنصرًا)</td><td>stone_hatchet, hammer, torch, spear, bow, pistol, ak47, furnace, campfire, wooden_door…</td><td>Tool/Weapon/Construction/Item</td><td class="num">999 (افتراضي)</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>وصفات الصياغة (18 — القائمة الكاملة)</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>id</th><th>المكوّنات</th><th>الناتج</th><th>craftTime*</th></tr></thead>
+      <tbody>
+        <tr><td>stone_axe</td><td>wood 200, stone 100</td><td>stone_hatchet ×1</td><td class="num">5s</td></tr>
+        <tr><td>stone_pickaxe</td><td>wood 200, stone 100</td><td>stone_pickaxe ×1</td><td class="num">5s</td></tr>
+        <tr><td>hammer</td><td>wood 100</td><td>hammer ×1</td><td class="num">4s</td></tr>
+        <tr><td>torch</td><td>wood 50, lgf 1</td><td>torch ×1</td><td class="num">3s</td></tr>
+        <tr><td>spear</td><td>wood 300</td><td>spear ×1</td><td class="num">6s</td></tr>
+        <tr><td>machete</td><td>iron 100</td><td>machete ×1</td><td class="num">8s</td></tr>
+        <tr><td>bow</td><td>wood 200, cloth 50</td><td>bow ×1</td><td class="num">8s</td></tr>
+        <tr><td>pistol</td><td>iron 150, pipe 1</td><td>pistol ×1</td><td class="num">10s</td></tr>
+        <tr><td>ak47</td><td>hqm 50, wood 200, scrap 50, pipe 1</td><td>ak47 ×1</td><td class="num">15s</td></tr>
+        <tr><td>furnace</td><td>stone 200, wood 100, lgf 10</td><td>furnace ×1</td><td class="num">12s</td></tr>
+        <tr><td>campfire</td><td>wood 100</td><td>campfire ×1</td><td class="num">10s</td></tr>
+        <tr><td>building_plan</td><td>wood 20</td><td>building_plan ×1</td><td class="num">2s</td></tr>
+        <tr><td>lock</td><td>iron 100</td><td>lock ×1</td><td class="num">4s</td></tr>
+        <tr><td>bandage</td><td>cloth 2</td><td>bandage ×1</td><td class="num">3s</td></tr>
+        <tr><td>syringe</td><td>iron 20, scrap 5, cloth 10</td><td>syringe ×1</td><td class="num">6s</td></tr>
+        <tr><td>wooden_door</td><td>wood 300</td><td>wooden_door ×1</td><td class="num">6s</td></tr>
+        <tr><td>codelock</td><td>frag 100</td><td>codelock ×1</td><td class="num">5s</td></tr>
+        <tr><td>wooden_box</td><td>wood 150</td><td>wooden_box ×1</td><td class="num">8s</td></tr>
+      </tbody>
+    </table></div>
+    <p style="font-size:.8rem;color:var(--text-dim)">* craftTime بيانات وصفية فقط حاليًا — الصياغة الفعلية فورية بلا مؤقت في كل من نسخة الويب ونسخة Unity الحالية.</p>
+
+    <h3>عقد الموارد (7)</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>النوع</th><th>المورد</th><th>الصحة (ضربات)</th><th>العائد/ضربة</th><th>respawn</th><th>الأداة</th></tr></thead>
+      <tbody>
+        <tr><td>tree</td><td>wood</td><td class="num">5</td><td class="num">12 (×2 بالفأس)</td><td class="num">120s</td><td>Axe</td></tr>
+        <tr><td>rock</td><td>stone</td><td class="num">6</td><td class="num">10 (×2 بالمعول)</td><td class="num">150s</td><td>Pickaxe</td></tr>
+        <tr><td>iron</td><td>iron</td><td class="num">6</td><td class="num">8 (×2)</td><td class="num">180s</td><td>Pickaxe</td></tr>
+        <tr><td>sulfur</td><td>sulfur</td><td class="num">6</td><td class="num">8 (×2)</td><td class="num">180s</td><td>Pickaxe</td></tr>
+        <tr><td>hemp</td><td>cloth</td><td class="num">2</td><td class="num">6</td><td class="num">90s</td><td>يدوي</td></tr>
+        <tr><td>berry_bush</td><td>berry</td><td class="num">2</td><td class="num">5</td><td class="num">100s</td><td>يدوي</td></tr>
+        <tr><td>barrel</td><td>scrap + lgf(2)</td><td class="num">3</td><td class="num">3</td><td class="num">200s</td><td>أي أداة</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>مستويات البناء (5) — نصف قطر Tool Cupboard = 25</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>المستوى</th><th>الصحة القصوى</th><th>تكلفة الترقية</th><th>تكلفة الإصلاح</th></tr></thead>
+      <tbody>
+        <tr><td>Twig</td><td class="num">10</td><td>مجاني</td><td>مجاني دائمًا</td></tr>
+        <tr><td>Wood</td><td class="num">250</td><td>wood 300</td><td>10% من تكلفة نفس المستوى</td></tr>
+        <tr><td>Stone</td><td class="num">500</td><td>stone 300</td><td>10% من تكلفة نفس المستوى</td></tr>
+        <tr><td>SheetMetal</td><td class="num">1000</td><td>frag 200</td><td>10% من تكلفة نفس المستوى</td></tr>
+        <tr><td>Armored</td><td class="num">2000</td><td>hqm 50</td><td>10% من تكلفة نفس المستوى</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>مؤثرات الاستهلاك (6)</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>العنصر</th><th>جوع</th><th>عطش</th><th>صحة</th><th>ملاحظة</th></tr></thead>
+      <tbody>
+        <tr><td>berry</td><td class="num">+8</td><td class="num">+4</td><td class="num">0</td><td>—</td></tr>
+        <tr><td>raw_meat</td><td class="num">+10</td><td class="num">0</td><td class="num">−5</td><td>خطر — اطبخه أولًا</td></tr>
+        <tr><td>cooked_meat</td><td class="num">+35</td><td class="num">0</td><td class="num">+5</td><td>—</td></tr>
+        <tr><td>canned_food</td><td class="num">+30</td><td class="num">+5</td><td class="num">0</td><td>—</td></tr>
+        <tr><td>water</td><td class="num">0</td><td class="num">+40</td><td class="num">0</td><td>—</td></tr>
+        <tr><td>bandage</td><td class="num">0</td><td class="num">0</td><td class="num">+25</td><td>يوقف النزيف</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="systems">
+    <h2>3. حالة الأنظمة (System Status Board)</h2>
+    <p class="lead">15 نظامًا من الخطة الأصلية. الحالة تعكس ما هو مكتوب فعليًا كملفات C#، وليس ما هو "مخطَّط له" فقط.</p>
+    <div class="sys-grid">
+
+      <div class="sys-card"><h4>Core <span class="status done">✅ مبني</span></h4>
+        <ul><li>GameEvents (event bus)</li><li>ServiceLocator</li><li>GameManager (boot sequence)</li></ul></div>
+
+      <div class="sys-card"><h4>طبقة البيانات <span class="status done">✅ مبني</span></h4>
+        <ul><li>7 أنواع ScriptableObject</li><li>5 ملفات JSON seed</li><li>Editor importer آلي</li></ul></div>
+
+      <div class="sys-card"><h4>Inventory <span class="status done">✅ مبني</span></h4>
+        <ul><li>InventorySystem (منقول من StorageInventory)</li><li>maxSlots مُفعَّل</li></ul></div>
+
+      <div class="sys-card"><h4>Crafting <span class="status done">✅ مبني</span></h4>
+        <ul><li>CraftingSystem (منطق all-or-nothing)</li><li>18 وصفة جاهزة</li></ul></div>
+
+      <div class="sys-card"><h4>Survival <span class="status done">✅ مبني</span></h4>
+        <ul><li>SurvivalStats.Tick() طبق الأصل</li><li>StaminaSystem + DamageSystem</li></ul></div>
+
+      <div class="sys-card"><h4>Player <span class="status partial">🟡 جزئي</span></h4>
+        <ul><li>PlayerController (حركة+قفز+جري)</li><li>لا يوجد PlayerInput/Actions asset بعد</li></ul></div>
+
+      <div class="sys-card"><h4>Interaction <span class="status partial">🟡 جزئي</span></h4>
+        <ul><li>IInteractable + Controller</li><li>ResourceNode, StorageBox, Campfire</li><li>لا يوجد Door/Loot كاملَين بعد</li></ul></div>
+
+      <div class="sys-card"><h4>Building <span class="status partial">🟡 جزئي</span></h4>
+        <ul><li>BuildingInstance + Upgrade/Repair</li><li>لا يوجد BuildingPlacer/Ghost (وضع فعلي)</li></ul></div>
+
+      <div class="sys-card"><h4>Save <span class="status done">✅ مبني</span></h4>
+        <ul><li>SaveData (شكل v3 مطابق)</li><li>SaveManager (A/B slots)</li><li>AutoSaveTimer</li></ul></div>
+
+      <div class="sys-card"><h4>World / Time-Weather <span class="status todo">⬜ لم يبدأ</span></h4>
+        <ul><li>لا TimeSystem</li><li>لا WeatherSystem</li><li>لا توليد عالم</li></ul></div>
+
+      <div class="sys-card"><h4>UI / HUD <span class="status todo">⬜ لم يبدأ</span></h4>
+        <ul><li>لا Canvas ولا Views</li></ul></div>
+
+      <div class="sys-card"><h4>Input (Mobile+PC) <span class="status todo">⬜ لم يبدأ</span></h4>
+        <ul><li>لا Input Actions asset</li><li>لا تحكم لمس</li></ul></div>
+
+      <div class="sys-card"><h4>Scenes / Prefabs <span class="status todo">⬜ لم يبدأ</span></h4>
+        <ul><li>لا يوجد مشهد واحد بعد</li></ul></div>
+
+      <div class="sys-card"><h4>Testing <span class="status todo">⬜ لم يبدأ</span></h4>
+        <ul><li>لا EditMode/PlayMode tests</li></ul></div>
+
+      <div class="sys-card"><h4>Combat / NPCs <span class="status todo">⬜ لم يبدأ (Phase 2 أصلًا)</span></h4>
+        <ul><li>نموذج game.js الأصلي (wolf/bear/scientist) مرجع سلوكي جيد لاحقًا</li></ul></div>
+
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <h2>4. خارطة الطريق القادمة</h2>
+    <p class="lead">الأساس (طبقة البيانات + الأنظمة الجوهرية) مبني. المراحل التالية تحوّله من "كود مجمَّع" إلى "لعبة قابلة للتشغيل فعليًا".</p>
+
+    <div class="phase">
+      <div class="ph-badge">A</div>
+      <div class="ph-body">
+        <h4>أول فتح فعلي + إصلاح أخطاء Compile</h4>
+        <p>فتح <span class="path">unity/RustgameUnity/</span> في Unity Editor، تشغيل <code>Rustgame → Import Seed Data</code>، إصلاح أي خطأ compile يظهر (متوقّع بنسبة معقولة لأن الكود لم يُصرَّف من قبل).</p>
+        <div class="accept">معيار القبول: المشروع يُفتح بلا أخطاء Console حمراء، و~70 asset بيانات تُنشأ بنجاح.</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-badge">B</div>
+      <div class="ph-body">
+        <h4>مشهد أولي + Player Prefab + دمج الأنظمة</h4>
+        <p>مشهد World.unity بسيط (أرضية + إضاءة)، Player Prefab يجمع CharacterController+PlayerController+SurvivalStats+InteractionController، وربط GameManager بكل شيء فعليًا (CollectSaveData الحالية placeholder فقط).</p>
+        <div class="accept">معيار القبول: يمكن الحركة والقفز والجري داخل Play Mode، وHunger/Stamina تنخفض حيًا.</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-badge">C</div>
+      <div class="ph-body">
+        <h4>Input Actions Asset + HUD أساسي</h4>
+        <p>Action Maps (Desktop + Touch) عبر Input System Package، وCanvas UGUI بأشرطة Health/Hunger/Thirst/Stamina/Temperature + حزام 1-6.</p>
+        <div class="accept">معيار القبول: كل مدخل (WASD/Space/Shift/E) يعمل عبر Input Actions لا Input.GetKey مباشرة، والـ HUD يتحدّث حيًا.</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-badge">D</div>
+      <div class="ph-body">
+        <h4>BuildingPlacer/Ghost + عالم بسيط</h4>
+        <p>وضع بناء فعلي (شبح شفاف + snap-to-grid + فحص تصادم)، وتوليد عدد من ResourceNode في مشهد اختباري بدل placeholder واحد.</p>
+        <div class="accept">معيار القبول: وضع جدار Twig وترقيته إلى Wood يعمل من البداية للنهاية.</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-badge">E</div>
+      <div class="ph-body">
+        <h4>اختبارات + أداء موبايل + Android Build</h4>
+        <p>EditMode tests لـ CraftingSystem/InventorySystem/SurvivalStats (توازي <code>tests/phase1.test.mjs</code>)، وضبط IL2CPP+ARM64، وبناء APK أول تجريبي.</p>
+        <div class="accept">معيار القبول: كل الاختبارات خضراء، وAPK يُثبَّت ويعمل على جهاز حقيقي.</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-badge">F</div>
+      <div class="ph-body">
+        <h4>Combat / NPCs (Phase 2)</h4>
+        <p>استخدام نموذج <code>NPC</code> الأصلي في game.js (ذئب/دب/عالِم) كمرجع سلوكي، لكن مع NavMesh حقيقي بدل الحركة الخطية المباشرة.</p>
+        <div class="accept">معيار القبول: مواجهة ذئب قابلة للربح بالأدوات الحجرية (نفس معيار PRD الأصلي).</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="risks">
+    <h2>5. المخاطر والقرارات المفتوحة</h2>
+    <div class="tbl-wrap"><table class="risk-table">
+      <thead><tr><th>البند</th><th>الحالة</th></tr></thead>
+      <tbody>
+        <tr><td>respawn القنب/التوت</td><td>✅ محسوم — أُصلح في JS ونُقل مُصلَحًا إلى Unity</td></tr>
+        <tr><td>حد 12 slot لصندوق التخزين</td><td>✅ محسوم — مُفعَّل في الاثنين على مستوى البيانات</td></tr>
+        <tr><td>توازن الصياغة (ITEMS_DATA مقابل recipes.js)</td><td>✅ محسوم — أرقام ITEMS_DATA هي الرسمية، وُحِّدت في الاثنين</td></tr>
+        <tr><td>نظام قفل الأبواب (codelock)</td><td>⬜ مفتوح — عنصر معرَّف بلا منطق في أي من النسختين</td></tr>
+        <tr><td>كاميرا Third-person</td><td>⬜ مفتوح — الأصل حيلة رندر فقط، ليست كاميرا حقيقية منفصلة</td></tr>
+        <tr><td>Pathfinding للأعداء</td><td>⬜ مفتوح — الأصل حركة خطية مباشرة بلا NavMesh</td></tr>
+        <tr><td>حجم اللعبة على الموبايل منخفض الفئة</td><td>⬜ يحتاج قياس فعلي بعد أول build</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="howto">
+    <h2>6. خطوات التشغيل العملية</h2>
+    <ol class="steps">
+      <li>تأكد من وجود <span class="path">unity/</span> محليًا: <code>git pull origin main</code>.</li>
+      <li>افتح <b>Unity Hub</b> → <b>Add</b> → اختر <span class="path">rust-game/unity/RustgameUnity/</span>.</li>
+      <li>ثبّت/استخدم Unity <code>6000.0.35f1</code> (أو أي 6000.0 LTS متوفر لديك).</li>
+      <li>انتظر أول فتح (بطيء — يبني <code>Library/</code> من الصفر، وهنا تظهر أخطاء Compile إن وُجدت).</li>
+      <li>من القائمة العلوية: <b>Rustgame → Import Seed Data</b> — ينشئ ~70 asset بيانات تلقائيًا.</li>
+      <li>أرسل أي رسالة خطأ من نافذة Console بالضبط (نص أو لقطة شاشة) — تُصلَح هنا في الكود وتُرفع، وتكرر نفس الخطوات.</li>
+    </ol>
+  </section>
+
+</div>
+
+<footer>RUSTGAME — وثيقة مُولَّدة من مراجعة فعلية للكود، 28 سبتمبر 2026. راجع أيضًا <span class="path">docs/UNITY_PORT_PLAN.md</span> و<span class="path">unity/README.md</span>.</footer>
+
+<script>
+try{
+  const saved = localStorage.getItem('theme');
+  if(saved) document.documentElement.setAttribute('data-theme', saved);
+}catch(e){}
+</script>
+</body>
+</html>
