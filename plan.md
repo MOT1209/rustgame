@@ -1,76 +1,152 @@
-# خطة الباقي — Rustgame Production-Ready
+# خطة الباقي — Rustgame
 
-> **الحالة الحالية:** ✅ المحور 1 (Vite & Local Deps) · ✅ المحور 2 (TypeScript) · ✅ المحور 3 (Vitest)
-> هذا الملف يوثّق المتبقي من خطة الإنتاجية بعد إغلاق المحاور 1–3.
+> **الحالة (2026-09-25):** ✅ محاور 1–5 · ✅ M1 طبقة المنصات · ✅ M2 سطح المكتب `.exe`
+> **البوابة最后一次:** 77/77 اختبار · `typecheck` 0 أخطاء · `build` ناجح · `.exe` مبني ومُشغَّل
+> **المتبقي:** M3 (سير عمل GitHub) · رفع فرع الأداء · تحقق المتصفح
 
 ---
 
-## المحور 4 — معالجة الحفظ (Save/Load)
+## ✅ المُنجز
 
-الملف الأساسي: `js/save/save-system.js` (حالياً: migrate v1→v2، لا يُسقط أبداً على أي إدخال، autosaver جاهز).
+| المحور | الحالة | الدليل |
+|---|---|---|
+| 1 — Vite & local deps | ✅ | بناء بلا CDN |
+| 2 — TypeScript | ✅ | `js/core`, `js/player`, `js/save`, `js/types` |
+| 3 — Vitest | ✅ | 6 ملفات اختبار |
+| 4 — Save/Load (A/B + كوتا) | ✅ | `js/save/save-system.ts` |
+| 4b — Save v3 (نار + أبواب) | ✅ | `SAVE_VERSION = 3` |
+| 5 — التوثيق | ✅ | `README.md` |
+| M1 — طبقة المنصات | ✅ | `js/core/platform.ts` + 11 اختباراً |
+| M2 — سطح مكتب `.exe` | ✅ | `electron/main.cjs` + `preload.cjs` |
+| M2b — إصلاح ESM | ✅ | `main.js → main.cjs` |
+
+### المنصات الثلاث (كود واحد، 3 أوضاع)
+
+| المنصة | المخرج | الأمر |
+|---|---|---|
+| 🌐 ويب | `www/` → Vercel | `npm run build` |
+| 📱 هاتف | مشروع `android/` | `npm run cap:sync` |
+| 🖥️ كمبيوتر | `dist/*.exe` | `npm run electron:dist` |
+
+**مصدر واحد للحقيقة:** `js/core/platform.ts` — وضع `auto | phone | desktop` محفوظ في
+`localStorage` (تفضيل جهاز، **ليس** في ملف الحفظ). الافتراضي: APK→هاتف، Electron→كمبيوتر، الويب→كشف تلقائي.
+المستخدم يختار يدوياً من شاشة البداية.
+
+---
+
+## 🚨 P0 — خطر فقدان بيانات (افعل أولاً)
+
+### رفع فرع الأداء `perf/phase2`
+
+**الحالة:** العمل موجود على القرص لكنه **غير مدفوع** لـ GitHub + 7 ملفات غير محفوظة.
+**.gitignore لا يحمي worktree** — `git clean -fdx` في المستودع قد يمسح `rust-game-perf/`.
+
+```bash
+cd "C:\Users\aihmo\alle folder von code\rust-game-perf"
+git add -A && git commit -m "wip(perf): frame-stats + perf overlay + benchmark scenarios"
+git push -u origin perf/phase2
+```
+
+**قبل الحذف:** احذف `rust-game-base` و `rust-game-perf` عبر `git worktree remove`
+(لا `rmdir` — يحطّم روابط git).
+
+### خريطة الـ worktrees (ليست نسخاً منفصلة)
+
+```
+rust-game         → main         → عمل الإنتاج (مدفوع)
+rust-game-perf    → perf/phase2  → عمل الأداء (غير مدفوع ⚠️)
+rust-game-base    → detached     → خط أساس نظيف للمقارنة
+```
+
+---
+
+## M3 — سير عمل GitHub (CI)
 
 ### المهام
-1. **تحويل `save-system.js` → `save-system.ts`**
-   - types رسمية في `js/types/game.ts`: `SaveGame` (شكل الحفظ الكامل) و `SaveStorage` (واجهة `getItem/setItem`).
-   - استبدال الـ JSDoc الموجود بتوسيد حقيقي؛ إزالة `any` في `blank()`.
-2. **تخزين A/B (شفّان متناوب)** لمقاومة تلف التخزين:
-   - `write(storage, key, save)` يكتب في الشق غير المستخدم (`key:a` / `key:b`) ثم يحدّد الشق الأحدث.
-   - `read(storage, key)` يجرّب الشقين + المفتاح القديم (`key` مباشرةً) — **توافق خلفي** مع الحفظ الحالي بلا ترحيل إجباري.
-   - الأحدث زمنياً يفوز؛ الشق التالف يُتجاهل تلقائياً.
-3. **تمييز أخطاء الكوتا**: التقاط `QuotaExceededError` من `storage.setItem` وتسجيله في `SaveSystem.lastWriteError` (للعرض في الواجهة لاحقاً). الواجهة الحالية `write(): boolean` تبقى كما هي.
-4. **اختبارات Vitest جديدة**:
-   - backend يرمي كوتا عند `setItem` → `write === false` و`lastWriteError` محدَّد.
-   - شق رئيسي تالف + شق سليم → `read` يسترجع السليم.
-   - حفظ بالمفتاح القديم (بدون شقّين) → يُقرأ بنجاح.
-   - autosaver: `markDirty` + `flush` بـ fake timers (`vi.useFakeTimers`).
-
-### القيود
-- **صفر تغيير في الأرقام**: `autosaveIntervalMs = 60000` وبقية `SURVIVAL_CONFIG` كما هي.
-- لا DOM/THREE داخل الوحدة (backend يُحقن كما اليوم).
-- خضراء قبل الإغلاق: `npm test` + `npm run typecheck` + `npm run build`.
+1. `.github/workflows/ci.yml` — على `push`/`pull_request` إلى `main`:
+   - `actions/checkout@v4` · `actions/setup-node@v5` (Node 24, cache npm)
+   - `npm ci` → `npm run typecheck` → `npm test` → `npm run build`
+   - رفع `www/` كـ artifact (لمعاينة سريعة)
+2. **بلا أسرار** — لا APK ولا Android SDK في CI (يحتاج JDK + SDK ≈ ثقيل).
+3. (اختياري لاحقاً) workflow منفصل لـ `windows-latest` يبني الـ `.exe` عند tag.
 
 ### DoD
-- [ ] `save-system.ts` موجود و`save-system.js` محذوف، صفر بقايا استيراد `.js` قديم.
-- [ ] اختبارات التعافي من التلف + الكوتا + التوافق الخلفي خضراء.
-- [ ] كل الاختبارات الحالية (31+) خضراء دون أي تعديل في المعادلات.
+- [ ] شارة CI خضراء على `main` بعد أول push.
+- [ ] `npm ci` ينجح من الصفر (بلا `node_modules`).
+- [ ] فشل الاختبار = workflow أحمر (لا تمرير صامت).
 
 ---
 
-## المحور 5 — التوثيق (Documentation)
+## P1 — تحقق المتصفح (معلّق)
 
-### المهام
-1. **`README.md`** (الحالي: سطر واحد `# rustgame`) يشمل:
-   - المتطلبات (Node 24+, npm) والأوامر: `npm run dev` / `build` / `preview` / `test` / `typecheck` / `cap:sync`.
-   - بنية المشروع (`js/core|player|inventory|crafting|world|interaction|save|input|ui|types`, `public/`, `www/`).
-   - ملاحظة Capacitor: `webDir = www` ويُبنى عبر `npm run build`.
-   - ملاحظة Service Worker: الكاش `rust-game-v3` مع مسارات نسبية.
-2. **توثيق الأنظمة**: جدول للوحدات الرئيسية ومسؤولياتها (مرجع سريع لكل نظام: survival / damage / stamina / save …).
-3. **دليل الاختبارات**: تشغيلها، أين تُضاف اختبارات جديدة، نمط `assert` داخل vitest.
-4. **CHANGELOG مختصر** لتغييرات المحاور 1–4.
+**العائق:** أتمتة المتصفح معطّلة في بيئة العمل — `localhost` لا يُوصَل من عمليات المتصفح
+(لا proxy في البيئة) والـ daemon يتجمد. `agent-browser` و Playwright كلاهما عالق.
 
-### DoD
-- [ ] README يكفي لمطوّر جديد لتشغيل المشروع من الصفر.
-- [ ] كل الأوامر الموثقة مُختبرة فعلياً.
+**ما تم:** تحقق حتمي بديل — كل موارد `www/` (8 ملفات) ترجع `HTTP 200`، والحزمة تحوي
+المنطق المطلوب بعد فحص الـ markers.
+
+**لإتمامه على جهازك:**
+```bash
+npm run preview        # ثم افتح http://localhost:4173
+```
+1. كونسول نظيف (0 أخطاء)؟ 2. زر البدء يعمل؟ 3. بدّل **[هاتف/كمبيوتر]** — هل تتغيّر
+الأزرار؟ 4. احفظ + أعد التحميل — هل تعود الحالة؟
+
+**بلا أداة تلقائية:** افتح كونسول المتصفح وتحقق من:
+```js
+__rustGame.snapshot()   // device, runtime, day, structures…
+```
 
 ---
 
-## ملاحظات وقرارات مفتوحة
+## P2 — تعرف الأرقام (Performance)
+
+`rust-game-perf` يضيف: `frame-stats` + طبقة قياس + سيناريوهات benchmark.
+الاستخدام المقصود: `rust-game-base` = خط أساس، `rust-game-perf` = بعد التحسين.
+القاعدة: **لا تعديل في `SURVIVAL_CONFIG` قبل قياس** — اقرأ `game-performance` skill.
+
+---
+
+## P3 — Phase 2 (من `PRD.md` §7)
+
+| # | مُسلَّم | شرط القبول |
+|---|---|---|
+| 2.1 | قتال حيواني + نهب بـ E | مواجهة ذئب قابلة للربح بالأدوات الحجرية + ضمادة واحدة |
+| 2.2 | فرن صهر + تلف طعام | خام → fragments · اللحم يفسد بعد N |
+| 2.3 | خريطة + بوصلة + POI | تحديد المعالم والبحيرة |
+| 2.4 | موبايل: زر E سياقي + أداء | اللعب باللمس كامل الحلقة |
+| 2.5 | QA شامل + 1.2.0 | CI أخضر + buildNumber جديد |
+
+---
+
+## قرارات مفتوحة (من `PRD.md` §9)
+
+1. فتحات حفظ متعددة في 2.x أم لاحقاً؟
+2. الذئاب تسقط لحم نيء مباشرة أم عبر ذبح بـ E؟ (المقترح: E)
+3. stack الخشب 1000 — يُخفَّض لزيادة التحدي؟
+4. Electron (225MB) أم Tauri (~10MB) لسطح المكتب؟ — **الأول منفَّذ**؛ التحويل لاحقاً إن لزم حجم أصغر.
+5. توقّع خلل بالتوازي: `eaedba0` ظهر من جلسة أخرى أثناء عملي — **يلزم تنسيق قبل أي تعديل مشترك**.
+
+---
+
+## ملاحظات تقنية قائمة
 
 | البند | التفاصيل |
 |---|---|
-| `npx cap sync android` | **لم يُختبر** — مجلد `android/` غير موجود في المستودع (يُنشَأ لاحقاً عبر `npx cap add android`). |
-| `js/game.js` | مستثنى من `tsconfig` (حجمه) — تدريجه تدريجياً اختياري لاحقاً. |
-| npm audit | 3 تحذيرات moderate (موجودة مسبقاً) — تُراجع عند الراحة. |
-| تحذير build | `<script src="js/update-checker.js">` غير bundled — **غير حرج**: الملف في `public/` ويُنسخ كما هو. |
-| تعديلات غير مقنّنة | `js/inventory/storage.js`, `js/ui/hud.js`, `js/world/weather.js` عليها تغييرات من جلسة سابقة — راجعها قبل ربطها بأي محور لاحق. |
-| تحقق المتصفح | بعد أي محور: فحص فعلي في المتصفح (skill: `browser-game-verification`). |
+| `js/game.js` | 2738 سطر، مستثنى من `tsconfig` — **لا تضف منطقاً جديداً**؛ استخرج وحدة. |
+| `type: module` | `electron/*.cjs` **إلزامي** — `require()` يفشل في ESM. لا تعُد لExtension `.js`. |
+| بناء `.exe` | ~5 دقائق (NSIS + محمولة). شغّله في الخلفية لا في مقدمة الطرفية. |
+| `npm audit` | 3 تحذيرات moderate (سابقة) + تحذيرات deprecation من electron-builder. |
+| `dist/` و `www/` | مُتجاهَلان في git — لا تحاول رفعهما. |
+| مصدر الهوية | `public/version.json` → `scripts/sync-version.mjs` يوزّعها على `package.json` + `build.gradle` + electron-builder. |
 
 ---
 
-## أوامر التحقق السريعة (قبل أي دفع)
+## أوامر التحقق (قبل أي push)
 
 ```bash
-npm test          # vitest — 31+ اختبار
-npm run typecheck # tsc --noEmit — 0 أخطاء
-npm run build     # vite build → www/
+npm test           # 77/77
+npm run typecheck  # 0 أخطاء
+npm run build      # → www/
+npm run electron:dist   # اختياري: ~5 دقائق
 ```
