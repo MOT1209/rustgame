@@ -29,6 +29,30 @@ Unity 6 — retargeting is a manifest change, not a code change:
 | com.unity.ugui | 1.0.0 | 2.0.0 |
 | com.unity.cinemachine | 2.6.4 | 3.1.2 |
 
+### Retargeting to Unity 6 (two files, once the editor is installed)
+
+1. `Packages/manifest.json` → the "Unity 6 (target)" column above.
+2. `ProjectSettings/ProjectVersion.txt` → `m_EditorVersion: 6000.0.35f1`
+   (and `m_EditorVersionWithRevision: 6000.0.35f1 (a0d8b6d23afa)`).
+3. Delete `Library/` and let the new editor re-import.
+
+Nothing else changes: the code is already inside the C# 7.3 subset, and the
+asmdefs reference `Unity.InputSystem` by assembly name, which is valid in both
+package versions.
+
+**Known blocker on this machine:** installing Unity 6000.0.35f1 fails during
+the component stage — the installer extracts the editor and then prunes
+`Editor/Data/Resources/PackageManager/` back to just `BuiltInPackages`, so
+`UnityPackageManager.exe` is missing and the editor exits with
+"Could not find Unity Package Manager local server application". The 4 GB
+installer is already downloaded to
+`%APPDATA%\UnityHub\downloads\UnitySetup64-6000.0.35f1.exe`; run it as
+**administrator** (`/S /D=C:\UnityEditors\6000.0.35f1`) and check that
+`Editor\Data\Resources\PackageManager\Server\UnityPackageManager.exe` survives
+the install. The same broken state exists for the Hub's `6000.5.4f1` entry,
+which should be removed from the Hub (or by deleting
+`C:\Program Files\Unity\Hub\Editor\6000.5.4f1` as administrator).
+
 ## Opening the project
 
 1. Open **2019.4.41f2** (or newer — the code is version-agnostic, but the
