@@ -10,6 +10,8 @@ import { FOOD_DEFS } from './inventory/items.js';
 import { StorageInventory } from './inventory/storage.js';
 import { getRecipe, craft as craftRecipe } from './crafting/recipes.js';
 import { getNodeDef, yieldForHit } from './world/resources.js';
+// Phase 2: animal combat + corpse loot (pure, testable — see tests/animals.test.ts)
+import { AnimalState, toolDamage } from './world/animals.ts';
 import { WATER_SOURCES, drink as drinkFromSource } from './world/water.js';
 import { WeatherSystem } from './world/weather.js';
 import { DayNight } from './world/day-night.js';
@@ -389,14 +391,19 @@ class NPC {
         this.mesh.userData = { npc: this, radius: 0.6 };
         scene.add(this.mesh);
         this.velocity = new THREE.Vector3();
-        this.health = type === 'bear' ? 120 : (type === 'scientist' ? 80 : 50);
-        this.maxHealth = this.health;
+        // Phase 2: health/loot rules live in the pure module so they can be
+        // unit-tested (js/world/animals.ts).
+        this.state = new AnimalState(type);
+        this.health = this.state.health;
+        this.maxHealth = this.state.maxHealth;
         this.lastAttack = 0;
         this.dead = false;
     }
     takeDamage(amount) {
         if (this.dead) return;
-        this.health -= amount;
+        const dealt = this.state.takeDamage(amount);
+        this.health = this.state.health;
+        if (dealt <= 0) return;
         // Flash red
         this.mesh.children.forEach(c => { if (c.isMesh) c.material.emissive.setHex(0xff0000); c.material.emissiveIntensity = 0.5; });
         setTimeout(() => {
@@ -406,29 +413,35 @@ class NPC {
     }
     die() {
         this.dead = true;
-        // Drop loot
-        const lootMap = { wolf: { cloth: 10, leather: 5 }, bear: { cloth: 15, leather: 10 }, scientist: { scrap: 15, frag: 10 } };
-        const loot = lootMap[this.type] || { cloth: 5 };
-        Object.entries(loot).forEach(([id, count]) => addItem(id, count));
-        showNotification(`${this.type} killed! +${Object.values(loot).reduce((a,b)=>a+b,0)} resources`, '#e74c3c');
-        // Remove from collision (Phase 1: world refs injected via constructor)
+        const self = this;
+        // Phase 2.1: the corpse STAYS in the world and is looted with E —
+        // the loot used to drop instantly on death.
+        this.mesh.userData.type = 'animal_corpse';
+        this.mesh.userData.animal = this;
+        this.mesh.rotation.x = -Math.PI / 2;   // lie flat
+        this.mesh.position.y = 0.25;
+        this.mesh.traverse(c => { if (c.isMesh && c.material && c.material.color) c.material.color.multiplyScalar(0.55); });
+        // Stop blocking movement...
         const colArr = (this.world && this.world.collisionObjects) || [];
         const idx = colArr.indexOf(this.mesh);
         if (idx !== -1) colArr.splice(idx, 1);
-        // Fade out and remove
-        const self = this;
-        const interval = setInterval(() => {
-            self.mesh.scale.multiplyScalar(0.9);
-            self.mesh.position.y -= 0.05;
-            if (self.mesh.scale.x < 0.1) {
-                clearInterval(interval);
-                if (self.scene) self.scene.remove(self.mesh);
-                // Remove from npcs array
-                const arr = (self.world && self.world.npcs) || [];
-                const npcIdx = arr.indexOf(self);
-                if (npcIdx !== -1) arr.splice(npcIdx, 1);
-            }
-        }, 30);
+        // ...but become an E target.
+        const inter = (this.world && this.world.interactables) || [];
+        if (inter.indexOf(this.mesh) === -1) inter.push(this.mesh);
+        // Despawn eventually so corpses don't pile up forever.
+        setTimeout(() => { self.removeCorpse(); }, 60000);
+        showNotification(`${this.state.name} down! Press E to loot`, '#e74c3c');
+        SoundFX.hit();
+    }
+    /** Removes the corpse from the scene and from the interaction list. */
+    removeCorpse() {
+        const inter = (this.world && this.world.interactables) || [];
+        const i = inter.indexOf(this.mesh);
+        if (i !== -1) inter.splice(i, 1);
+        const arr = (this.world && this.world.npcs) || [];
+        const n = arr.indexOf(this);
+        if (n !== -1) arr.splice(n, 1);
+        if (this.scene) this.scene.remove(this.mesh);
     }
     update(delta, playerPos) {
         if (this.dead) return;
@@ -1142,12 +1155,30 @@ try {
             return true;
         },
     });
+    /** Phase 2.1: loot a dead animal with E. Can only be done once. */
+    function lootAnimalCorpse(animal) {
+        const loot = animal.state.lootOnce();
+        if (!loot) {
+            showNotification('Already looted', '#95a5a6');
+            animal.removeCorpse();
+            return true;
+        }
+        const gained = [];
+        Object.entries(loot).forEach(([id, count]) => { addItem(id, count); gained.push(`${count} ${id}`); });
+        showNotification(`Looted ${animal.state.name}: ${gained.join(', ')}`, '#f39c12');
+        SoundFX.harvest();
+        animal.removeCorpse();
+        updateHUD();
+        return true;
+    }
+
     interaction.register(InteractKinds.LOOT, {
         priority: 20,
         canInteract: (c) => !!(c && c.kind === 'loot' && c.root),
-        label: () => 'E — Loot crate',
+        label: (c) => ((c && c.root && c.root.userData.animal) ? `E — Loot ${c.root.userData.animal.state.name}` : 'E — Loot crate'),
         act: (c) => {
             const root = c.root;
+            if (root.userData.animal) return lootAnimalCorpse(root.userData.animal);
             const gained = [];
             const scrap = 4 + Math.floor(Math.random() * 5);
             addItem('scrap', scrap); gained.push(`${scrap} scrap`);
@@ -1257,7 +1288,7 @@ try {
             let kind = null;
             if (ud.type === 'storage') kind = 'storage';
             else if (ud.type === 'water') kind = 'drink';
-            else if (ud.type === 'crate') kind = 'loot';
+            else if (ud.type === 'crate' || ud.type === 'animal_corpse') kind = 'loot';
             else if (ud.type === 'door') kind = 'door';
             else if (ud.type === 'campfire') {
                 const d = Math.sqrt((camera.position.x - root.position.x) ** 2 + (camera.position.z - root.position.z) ** 2);
@@ -1411,7 +1442,7 @@ try {
         const x = (Math.random() - 0.5) * CONFIG.WORLD_SIZE;
         const z = (Math.random() - 0.5) * CONFIG.WORLD_SIZE;
         const type = Math.random() > 0.3 ? 'wolf' : 'bear';
-        const npc = new NPC(scene, type, new THREE.Vector3(x, getTerrainHeight(x, z), z), { collisionObjects, npcs });
+        const npc = new NPC(scene, type, new THREE.Vector3(x, getTerrainHeight(x, z), z), { collisionObjects, npcs, interactables });
         npcs.push(npc);
         collisionObjects.push(npc.mesh);
     }
@@ -1677,10 +1708,18 @@ try {
             // NPC Damage
             const hitNpc = obj.userData.npc || (obj.parent && obj.parent.userData && obj.parent.userData.npc);
             if (hitNpc && !hitNpc.dead) {
-                hitNpc.takeDamage(15);
+                // Phase 2: the equipped tool decides the damage (stone tools
+                // kill a wolf in 3 hits, bare hands need 10).
+                hitNpc.takeDamage(toolDamage(activeToolId));
                 showHitMarker();
                 screenFlash('rgba(255,0,0,0.1)');
                 SoundFX.hit();
+                return;
+            }
+
+            if (obj.userData.type === 'animal_corpse') {
+                showHitMarker();
+                showNotification('Press E to loot the corpse', '#f39c12');
                 return;
             }
 
@@ -2527,7 +2566,7 @@ try {
         placeStructure: (...a) => window.__phase1.placeStructure(...a),
         placeCampfire: (x, z) => placeCampfire(x, z),
         spawnNpc: (type, x, z) => {
-            const npc = new NPC(scene, type, new THREE.Vector3(x, getTerrainHeight(x, z), z), { collisionObjects, npcs });
+            const npc = new NPC(scene, type, new THREE.Vector3(x, getTerrainHeight(x, z), z), { collisionObjects, npcs, interactables });
             npcs.push(npc); collisionObjects.push(npc.mesh);
         },
         pinHealth: () => { state.stats.health = 100; state.stats.bleeding = 0; },
