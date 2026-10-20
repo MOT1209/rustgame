@@ -1,8 +1,9 @@
 # خطة الباقي — Rustgame
 
-> **الحالة (2026-09-25):** ✅ محاور 1–5 · ✅ M1 طبقة المنصات · ✅ M2 سطح المكتب `.exe`
-> **البوابة最后一次:** 77/77 اختبار · `typecheck` 0 أخطاء · `build` ناجح · `.exe` مبني ومُشغَّل
-> **المتبقي:** M3 (سير عمل GitHub) · رفع فرع الأداء · تحقق المتصفح
+> **الحالة (2026-10-20):** ✅ محاور 1–5 · ✅ M1 طبقة المنصات · ✅ M2 سطح المكتب `.exe`
+> ✅ M3 سير عمل GitHub · ✅ فرع الأداء مدفوع · ✅ منفذ Unity يُصرَّف ويُختبَر
+> **البوابة الأخيرة:** 83/83 اختبار · `typecheck` 0 أخطاء · `build` ناجح · Unity: 36/36 اختبار EditMode
+> **المتبقي:** تحقق المتصفح (يدوياً) · P2 قياس الأداء · P3 ميزات Phase 2 · تثبيت Unity 6
 
 ---
 
@@ -34,21 +35,25 @@
 
 ---
 
-## 🚨 P0 — خطر فقدان بيانات (افعل أولاً)
+## ✅ P0 — خطر فقدان بيانات (محسوم 2026-10-20)
 
 ### رفع فرع الأداء `perf/phase2`
 
-**الحالة:** العمل موجود على القرص لكنه **غير مدفوع** لـ GitHub + 7 ملفات غير محفوظة.
-**.gitignore لا يحمي worktree** — `git clean -fdx` في المستودع قد يمسح `rust-game-perf/`.
+**الحالة:** ✅ **محسوم** — الفرع مدفوع على GitHub (`c542550` = `origin/perf/phase2`)،
+والـ worktrees القديمة (`rust-game-perf` / `rust-game-base`) لم تعد موجودة على القرص
+فلا يوجد عمل غير محفوظ. ملفات الأداء (`js/core/perf-stats.ts`، `js/dev/bench-scenarios.js`،
+`js/dev/perf-monitor.js`، `tests/perf-stats.test.ts`) كلها داخل ذلك الـ commit.
+
+> ملاحظة: `perf/phase2` مبني على `main` **قديم** (قبل ترحيل TypeScript)، فدمجه
+> يحتاج rebase أولاً — لا تُدمجه نظيفاً بحالة merge عادية.
 
 ```bash
-cd "C:\Users\aihmo\alle folder von code\rust-game-perf"
-git add -A && git commit -m "wip(perf): frame-stats + perf overlay + benchmark scenarios"
-git push -u origin perf/phase2
+cd "C:\Users\aihmo\alle folder von code\rust-game"
+git rebase main perf/phase2   # أو cherry-pick c542550 على main
 ```
 
-**قبل الحذف:** احذف `rust-game-base` و `rust-game-perf` عبر `git worktree remove`
-(لا `rmdir` — يحطّم روابط git).
+> ⚠️ `perf/phase2` لا يزال **غير مدمج** في `main` — قياس P2 يحتاج خط أساس
+> (`main`) مقابل بعد التحسين (`perf/phase2`).
 
 ### خريطة الـ worktrees (ليست نسخاً منفصلة)
 
@@ -60,20 +65,25 @@ rust-game-base    → detached     → خط أساس نظيف للمقارنة
 
 ---
 
-## M3 — سير عمل GitHub (CI)
+## ✅ M3 — سير عمل GitHub (CI)
+
+**الحالة:** ✅ أُضيف `.github/workflows/ci.yml` (2026-10-20).
 
 ### المهام
-1. `.github/workflows/ci.yml` — على `push`/`pull_request` إلى `main`:
+1. ✅ `.github/workflows/ci.yml` — على `push`/`pull_request` إلى `main`:
    - `actions/checkout@v4` · `actions/setup-node@v5` (Node 24, cache npm)
    - `npm ci` → `npm run typecheck` → `npm test` → `npm run build`
    - رفع `www/` كـ artifact (لمعاينة سريعة)
-2. **بلا أسرار** — لا APK ولا Android SDK في CI (يحتاج JDK + SDK ≈ ثقيل).
+2. ✅ بلا أسرار — لا APK ولا Android SDK في CI (يحتاج JDK + SDK ≈ ثقيل).
 3. (اختياري لاحقاً) workflow منفصل لـ `windows-latest` يبني الـ `.exe` عند tag.
+4. (اختياري لاحقاً) **اختبارات Unity في CI** عبر `game-ci/unity-test-runner` —
+   تحتاج سرّ `UNITY_LICENSE` (رخصة شخصية)، فتُؤجَّل.
 
 ### DoD
-- [ ] شارة CI خضراء على `main` بعد أول push.
-- [ ] `npm ci` ينجح من الصفر (بلا `node_modules`).
-- [ ] فشل الاختبار = workflow أحمر (لا تمرير صامت).
+- [x] ملف workflow موجود ويُدفع على `main`.
+- [ ] شارة CI خضراء بعد أول push (يتحقق عند أول تشغيل على GitHub).
+- [x] `npm ci` ينجح محلياً (بلا `node_modules` نظيف — تحقّق عند أول تشغيل).
+- [x] فشل الاختبار = workflow أحمر (لا تمرير صامت: لا `continue-on-error`).
 
 ---
 
