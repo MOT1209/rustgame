@@ -24,9 +24,21 @@ namespace Rustgame.World
         /// exactly one system (the player's inventory) adds them.</summary>
         public event Action<ResourceNode, string, int> OnHarvested;
 
+        /// <summary>Raised once when the node runs out of hits.</summary>
+        public event Action<ResourceNode> OnDepleted;
+
         public InteractionKind Kind { get { return InteractionKind.Gather; } }
         public ResourceNodeDefinition Definition { get { return definition; } }
         public bool IsDepleted { get { return currentHealth <= 0; } }
+
+        /// <summary>Assign the definition and reset health. Called automatically
+        /// from Awake when definition is set in the Inspector; exposed publicly
+        /// for procedural spawning and EditMode tests.</summary>
+        public void Configure(ResourceNodeDefinition def)
+        {
+            definition = def;
+            currentHealth = definition != null ? definition.nodeHealth : 1;
+        }
 
         void Awake()
         {
@@ -79,6 +91,7 @@ namespace Rustgame.World
 
             if (currentHealth <= 0)
             {
+                if (OnDepleted != null) OnDepleted(this);
                 gameObject.SetActive(false);
                 var respawnService = Core.ServiceLocator.Get<ResourceRespawnService>();
                 if (respawnService != null)
@@ -103,9 +116,12 @@ namespace Rustgame.World
             switch (required)
             {
                 case ToolType.Axe:
-                    return equippedToolId.Contains("hatchet") || equippedToolId.Contains("axe");
+                    // "stone_pickaxe".Contains("axe") is true, so a plain Contains
+                    // check would hand a pickaxe the axe bonus (the JS original
+                    // has that quirk). Match the axe ids precisely instead.
+                    return equippedToolId.Contains("hatchet") || equippedToolId.EndsWith("_axe");
                 case ToolType.Pickaxe:
-                    return equippedToolId.Contains("pickaxe") || equippedToolId.Contains("pick");
+                    return equippedToolId.Contains("pickaxe");
                 default:
                     return false;
             }

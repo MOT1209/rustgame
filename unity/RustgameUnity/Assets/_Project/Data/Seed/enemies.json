@@ -1,0 +1,15 @@
+{
+  "enemies": [
+    { "enemyType": "wolf", "maxHealth": 50, "damage": 12, "agroRange": 18, "attackRange": 2.5, "attackCooldownSeconds": 1.2, "moveSpeed": 5, "bleedChance": 0.25,
+      "lootTable": [ { "itemId": "cloth", "count": 10 }, { "itemId": "leather", "count": 5 } ] },
+    { "enemyType": "bear", "maxHealth": 120, "damage": 20, "agroRange": 18, "attackRange": 2.5, "attackCooldownSeconds": 1.2, "moveSpeed": 3, "bleedChance": 0.25,
+      "lootTable": [ { "itemId": "cloth", "count": 15 }, { "itemId": "leather", "count": 10 } ] },
+    { "enemyType": "scientist", "maxHealth": 80, "damage": 8, "agroRange": 30, "attackRange": 12, "attackCooldownSeconds": 0.8, "moveSpeed": 5, "bleedChance": 0,
+      "lootTable": [ { "itemId": "scrap", "count": 15 }, { "itemId": "frag", "count": 10 } ] }
+  ],
+  "notes": [
+    "All numbers verified from game.js class NPC (constructor + update()). Movement in the original is a direct straight line toward the player with no pathfinding — the Unity EnemyAI.cs uses a real NavMeshAgent instead, a deliberate improvement, not a literal port.",
+    "scientist has a decorative gun mesh in the original but no ranged attack logic — melee-only like the others, just with a longer attackRange (12) standing in for it. Not changed here.",
+    "Loot is granted directly on death (game.js NPC.die()), not via an E-loot interaction."
+  ]
+}

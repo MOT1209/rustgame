@@ -1,0 +1,75 @@
+{
+    "name": "RustgameControls",
+    "maps": [
+        {
+            "name": "Gameplay",
+            "id": "a1b2c3d4-0001-4000-8000-000000000001",
+            "actions": [
+                { "name": "Move", "type": "Value", "id": "a1b2c3d4-0001-4000-8000-000000000101", "expectedControlType": "Vector2", "processors": "", "interactions": "", "initialStateCheck": true },
+                { "name": "Sprint", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000102", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Jump", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000103", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Interact", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000104", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Gather", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000105", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Blueprint", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000106", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "RepairUpgrade", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000107", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Bag", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000108", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Belt1", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000109", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Belt2", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000110", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Belt3", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000111", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Belt4", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000112", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Belt5", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000113", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Belt6", "type": "Button", "id": "a1b2c3d4-0001-4000-8000-000000000114", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false }
+            ],
+            "bindings": [
+                { "name": "WASD", "id": "a1b2c3d4-0001-4000-8000-000000001001", "path": "2DVector", "interactions": "", "processors": "", "groups": "", "action": "Move", "isComposite": true, "isPartOfComposite": false },
+                { "name": "up", "id": "a1b2c3d4-0001-4000-8000-000000001002", "path": "<Keyboard>/w", "interactions": "", "processors": "", "groups": "Desktop", "action": "Move", "isComposite": false, "isPartOfComposite": true },
+                { "name": "down", "id": "a1b2c3d4-0001-4000-8000-000000001003", "path": "<Keyboard>/s", "interactions": "", "processors": "", "groups": "Desktop", "action": "Move", "isComposite": false, "isPartOfComposite": true },
+                { "name": "left", "id": "a1b2c3d4-0001-4000-8000-000000001004", "path": "<Keyboard>/a", "interactions": "", "processors": "", "groups": "Desktop", "action": "Move", "isComposite": false, "isPartOfComposite": true },
+                { "name": "right", "id": "a1b2c3d4-0001-4000-8000-000000001005", "path": "<Keyboard>/d", "interactions": "", "processors": "", "groups": "Desktop", "action": "Move", "isComposite": false, "isPartOfComposite": true },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001006", "path": "<Keyboard>/leftShift", "interactions": "", "processors": "", "groups": "Desktop", "action": "Sprint", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001007", "path": "<Keyboard>/space", "interactions": "", "processors": "", "groups": "Desktop", "action": "Jump", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001008", "path": "<Keyboard>/e", "interactions": "", "processors": "", "groups": "Desktop", "action": "Interact", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001009", "path": "<Mouse>/leftButton", "interactions": "", "processors": "", "groups": "Desktop", "action": "Gather", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001010", "path": "<Keyboard>/f", "interactions": "", "processors": "", "groups": "Desktop", "action": "Gather", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001011", "path": "<Keyboard>/q", "interactions": "", "processors": "", "groups": "Desktop", "action": "Blueprint", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001012", "path": "<Keyboard>/h", "interactions": "", "processors": "", "groups": "Desktop", "action": "RepairUpgrade", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001013", "path": "<Keyboard>/t", "interactions": "", "processors": "", "groups": "Desktop", "action": "Bag", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001014", "path": "<Keyboard>/1", "interactions": "", "processors": "", "groups": "Desktop", "action": "Belt1", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001015", "path": "<Keyboard>/2", "interactions": "", "processors": "", "groups": "Desktop", "action": "Belt2", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001016", "path": "<Keyboard>/3", "interactions": "", "processors": "", "groups": "Desktop", "action": "Belt3", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001017", "path": "<Keyboard>/4", "interactions": "", "processors": "", "groups": "Desktop", "action": "Belt4", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001018", "path": "<Keyboard>/5", "interactions": "", "processors": "", "groups": "Desktop", "action": "Belt5", "isComposite": false, "isPartOfComposite": false },
+                { "id": "a1b2c3d4-0001-4000-8000-000000001019", "path": "<Keyboard>/6", "interactions": "", "processors": "", "groups": "Desktop", "action": "Belt6", "isComposite": false, "isPartOfComposite": false }
+            ]
+        },
+        {
+            "name": "Touch",
+            "id": "a1b2c3d4-0002-4000-8000-000000000001",
+            "actions": [
+                { "name": "Move", "type": "Value", "id": "a1b2c3d4-0002-4000-8000-000000000101", "expectedControlType": "Vector2", "processors": "", "interactions": "", "initialStateCheck": true },
+                { "name": "Sprint", "type": "Button", "id": "a1b2c3d4-0002-4000-8000-000000000102", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Jump", "type": "Button", "id": "a1b2c3d4-0002-4000-8000-000000000103", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Interact", "type": "Button", "id": "a1b2c3d4-0002-4000-8000-000000000104", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false },
+                { "name": "Gather", "type": "Button", "id": "a1b2c3d4-0002-4000-8000-000000000105", "expectedControlType": "Button", "processors": "", "interactions": "", "initialStateCheck": false }
+            ],
+            "bindings": []
+        }
+    ],
+    "controlSchemes": [
+        {
+            "name": "Desktop",
+            "bindingGroup": "Desktop",
+            "devices": [
+                { "devicePath": "<Keyboard>", "isOptional": false, "isOR": false },
+                { "devicePath": "<Mouse>", "isOptional": false, "isOR": false }
+            ]
+        },
+        {
+            "name": "Touch",
+            "bindingGroup": "Touch",
+            "devices": [
+                { "devicePath": "<Touchscreen>", "isOptional": false, "isOR": false }
+            ]
+        }
+    ]
+}

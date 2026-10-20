@@ -43,7 +43,7 @@ namespace Rustgame.Player
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (UnityEngine.Input.GetKeyDown(KeyCode.Escape))
             {
                 var locking = Cursor.lockState != CursorLockMode.Locked;
                 Cursor.lockState = locking ? CursorLockMode.Locked : CursorLockMode.None;
@@ -53,33 +53,33 @@ namespace Rustgame.Player
             if (Cursor.lockState == CursorLockMode.Locked)
                 Look();
 
-            var move = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
-            var sprint = Input.GetKey(KeyCode.LeftShift);
-            var jump = Input.GetButtonDown("Jump");
+            var move = new Vector2(UnityEngine.Input.GetAxisRaw("Horizontal"), UnityEngine.Input.GetAxisRaw("Vertical"));
+            var sprint = UnityEngine.Input.GetKey(KeyCode.LeftShift);
+            var jump = UnityEngine.Input.GetButtonDown("Jump");
             controller.Move(move, sprint, jump, Time.deltaTime);
 
             stats.Tick(Time.deltaTime, new SurvivalEnv { sprinting = controller.IsSprinting });
             controller.SetFreezing(stats.IsFreezing);
 
-            if (Input.GetKeyDown(KeyCode.E))
+            if (UnityEngine.Input.GetKeyDown(KeyCode.E))
             {
                 // E never gathers — gathering is a direct hit (LMB).
                 var handled = interaction != null && interaction.TryInteract(kind => kind != InteractionKind.Gather);
                 if (!handled) GameEvents.RaiseOpenInventoryRequested();
             }
 
-            if (Input.GetMouseButtonDown(0))
+            if (UnityEngine.Input.GetMouseButtonDown(0))
             {
                 if (interaction != null) interaction.TryInteract(kind => kind == InteractionKind.Gather);
             }
 
-            if (stats.IsDead && Input.GetKeyDown(KeyCode.R)) stats.Revive();
+            if (stats.IsDead && UnityEngine.Input.GetKeyDown(KeyCode.R)) stats.Revive();
         }
 
         void Look()
         {
-            var mx = Input.GetAxis("Mouse X") * mouseSensitivity;
-            var my = Input.GetAxis("Mouse Y") * mouseSensitivity;
+            var mx = UnityEngine.Input.GetAxis("Mouse X") * mouseSensitivity;
+            var my = UnityEngine.Input.GetAxis("Mouse Y") * mouseSensitivity;
             transform.Rotate(Vector3.up * mx);
             pitch = Mathf.Clamp(pitch - my, -80f, 80f);
             if (cameraPivot != null) cameraPivot.localEulerAngles = new Vector3(pitch, 0, 0);

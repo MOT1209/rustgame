@@ -1,7 +1,9 @@
 {
     "name": "Rustgame.Runtime",
     "rootNamespace": "Rustgame",
-    "references": [],
+    "references": [
+        "Unity.InputSystem"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
