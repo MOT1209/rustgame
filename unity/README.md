@@ -82,6 +82,14 @@ which should be removed from the Hub (or by deleting
   Unity.exe -batchmode -nographics -runTests -projectPath <project> \
             -testPlatform EditMode -testResults <out.xml>
   ```
+* PlayMode tests live in `Assets/_Project/Tests/PlayMode/` and prove the
+  runtime wiring end to end — gathering a node must credit the player's
+  inventory (through the event bus) and the autosave payload must carry the
+  item:
+  ```
+  Unity.exe -batchmode -nographics -runTests -projectPath <project> \
+            -testPlatform PlayMode -testResults <out.xml>
+  ```
 
 ## Opening the project (legacy notes)
 
