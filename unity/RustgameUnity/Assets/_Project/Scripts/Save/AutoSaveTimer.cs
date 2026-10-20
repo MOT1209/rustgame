@@ -13,7 +13,10 @@ namespace Rustgame.Save
     public class AutoSaveTimer : MonoBehaviour
     {
         [SerializeField] float intervalSeconds = 60f;
-        [SerializeField] System.Func<SaveData> collectSaveData;
+
+        // Not [SerializeField]: Unity cannot serialize a delegate, so the
+        // attribute would only ever show up as a permanently empty slot.
+        System.Func<SaveData> collectSaveData;
 
         float timer;
 

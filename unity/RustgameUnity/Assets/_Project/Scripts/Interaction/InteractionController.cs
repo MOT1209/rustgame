@@ -1,4 +1,6 @@
+using System;
 using UnityEngine;
+using Rustgame.Core;
 
 namespace Rustgame.Interaction
 {
@@ -8,7 +10,8 @@ namespace Rustgame.Interaction
     /// game.js's raycast-driven E handling (verified: INTERACT_DISTANCE = 5.0).
     /// If nothing interactable is hit, E falls back to toggling the inventory
     /// panel — that's the one piece of behavior this controller does NOT own
-    /// (wire it from PlayerInput/UI, since this class has no UI dependency).
+    /// (the caller raises GameEvents.OpenInventoryRequested instead, since this
+    /// class has no UI dependency).
     /// </summary>
     public class InteractionController : MonoBehaviour
     {
@@ -19,8 +22,8 @@ namespace Rustgame.Interaction
         IInteractable current;
         InteractionContext currentCtx;
 
-        public IInteractable Current => current;
-        public string CurrentPrompt => current != null ? current.GetPromptText(currentCtx) : null;
+        public IInteractable Current { get { return current; } }
+        public string CurrentPrompt { get { return current != null ? current.GetPromptText(currentCtx) : null; } }
 
         void Reset()
         {
@@ -43,11 +46,15 @@ namespace Rustgame.Interaction
             var interactable = hit.collider.GetComponentInParent<IInteractable>();
             if (interactable == null) return;
 
+            var gm = ServiceLocator.Get<GameManager>();
+
             var ctx = new InteractionContext
             {
                 player = raycastCamera.transform.root.gameObject,
                 distance = hit.distance,
-                equippedToolId = null, // wire to the belt's active slot once InventorySystem is hooked up
+                // The equipped tool used to be hardcoded to null, which silently
+                // killed the ×2 correct-tool gather bonus for every node.
+                equippedToolId = gm != null ? gm.EquippedToolId : null,
             };
 
             if (!interactable.CanInteract(ctx)) return;
@@ -56,11 +63,14 @@ namespace Rustgame.Interaction
             currentCtx = ctx;
         }
 
-        /// <summary>Call from PlayerInput's Interact action. Returns true if something
-        /// was actually interacted with (caller opens inventory on false).</summary>
-        public bool TryInteract()
+        /// <summary>Call from the player's interaction action. Returns true if
+        /// something was actually interacted with (the caller opens the
+        /// inventory on false). The optional filter lets the caller route by
+        /// kind — E handles context interactions, LMB handles gathering.</summary>
+        public bool TryInteract(Func<InteractionKind, bool> filter = null)
         {
             if (current == null) return false;
+            if (filter != null && !filter(current.Kind)) return false;
             return current.Interact(currentCtx);
         }
     }

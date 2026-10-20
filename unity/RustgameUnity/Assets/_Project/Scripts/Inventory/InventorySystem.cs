@@ -14,15 +14,15 @@ namespace Rustgame.Inventory
     /// </summary>
     public class InventorySystem
     {
-        readonly List<ItemStack> items = new();
+        readonly List<ItemStack> items = new List<ItemStack>();
         readonly Func<string, int> stackLimitLookup;
         readonly Func<string, bool> isKnownItem;
 
         /// <summary>Max number of distinct item stacks. 0 = unlimited. Restocking an
         /// item already present never counts against this limit.</summary>
-        public int MaxSlots { get; }
+        public int MaxSlots { get; private set; }
 
-        public IReadOnlyList<ItemStack> Items => items;
+        public IReadOnlyList<ItemStack> Items { get { return items; } }
 
         public InventorySystem(Func<string, int> stackLimitLookup, Func<string, bool> isKnownItem = null, int maxSlots = 0)
         {
@@ -37,7 +37,23 @@ namespace Rustgame.Inventory
             return idx >= 0 ? items[idx].count : 0;
         }
 
-        public bool Has(string itemId, int amount = 1) => amount > 0 && Count(itemId) >= amount;
+        public bool Has(string itemId, int amount = 1) { return amount > 0 && Count(itemId) >= amount; }
+
+        /// <summary>True when the whole amount would fit — either into the
+        /// existing stack (up to its limit) or into a free slot. Callers use
+        /// this to check a result BEFORE consuming the ingredients, so a full
+        /// stack can never eat the materials for a craft.</summary>
+        public bool CanAccept(string itemId, int amount)
+        {
+            if (string.IsNullOrEmpty(itemId) || amount <= 0) return false;
+
+            var limit = stackLimitLookup(itemId);
+            var idx = items.FindIndex(i => i.itemId == itemId);
+
+            if (idx >= 0) return items[idx].count + amount <= limit;
+            if (MaxSlots > 0 && items.Count >= MaxSlots) return false;
+            return amount <= limit;
+        }
 
         /// <summary>Add items. Returns amount actually added (0 if unknown item,
         /// stack cap reached, or all slots taken by a different item type).</summary>
@@ -95,6 +111,6 @@ namespace Rustgame.Inventory
             return added;
         }
 
-        public int Total() => items.Sum(i => i.count);
+        public int Total() { return items.Sum(i => i.count); }
     }
 }

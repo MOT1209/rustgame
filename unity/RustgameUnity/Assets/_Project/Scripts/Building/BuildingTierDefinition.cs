@@ -19,7 +19,7 @@ namespace Rustgame.Building
         public BuildingTier tier;
         public int maxHealth;
         public Color color = Color.white;
-        public List<ItemStack> upgradeCost = new();
+        public List<ItemStack> upgradeCost = new List<ItemStack>();
         [Range(0f, 1f)] public float repairCostFraction = 0.10f;
     }
 }

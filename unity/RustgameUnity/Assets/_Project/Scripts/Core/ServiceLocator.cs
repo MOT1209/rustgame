@@ -11,21 +11,31 @@ namespace Rustgame.Core
     /// </summary>
     public static class ServiceLocator
     {
-        static readonly Dictionary<Type, object> services = new();
+        static readonly Dictionary<Type, object> services = new Dictionary<Type, object>();
 
         public static void Register<T>(T service) where T : class
         {
+            if (service == null) return;
             services[typeof(T)] = service;
+        }
+
+        /// <summary>Removes a registration. Systems call this from OnDestroy so a
+        /// destroyed service is never handed out by Get().</summary>
+        public static void Unregister<T>() where T : class
+        {
+            services.Remove(typeof(T));
         }
 
         public static T Get<T>() where T : class
         {
-            return services.TryGetValue(typeof(T), out var service) ? (T)service : null;
+            object service;
+            return services.TryGetValue(typeof(T), out service) ? (T)service : null;
         }
 
         public static bool TryGet<T>(out T service) where T : class
         {
-            if (services.TryGetValue(typeof(T), out var raw))
+            object raw;
+            if (services.TryGetValue(typeof(T), out raw))
             {
                 service = (T)raw;
                 return true;
@@ -35,6 +45,6 @@ namespace Rustgame.Core
         }
 
         /// <summary>Call when leaving the gameplay scene / on domain reload in tests.</summary>
-        public static void Clear() => services.Clear();
+        public static void Clear() { services.Clear(); }
     }
 }

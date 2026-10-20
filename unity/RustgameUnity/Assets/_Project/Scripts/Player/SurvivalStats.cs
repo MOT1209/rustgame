@@ -28,7 +28,7 @@ namespace Rustgame.Player
         [SerializeField] SurvivalConfigSO config;
 
         public float Health { get; set; }
-        public float MaxHealth { get; set; } = 100f;
+        public float MaxHealth { get; set; }
         public float Hunger { get; private set; }
         public float Thirst { get; private set; }
         public float Stamina { get; set; }
@@ -38,8 +38,27 @@ namespace Rustgame.Player
         public bool IsFreezing { get; private set; }
         public bool IsDead { get; private set; }
 
+        /// <summary>The live config — other systems (gathering, crafting) read
+        /// balance numbers from here instead of hardcoding them.</summary>
+        public SurvivalConfigSO Config { get { return config; } }
+
         void Awake()
         {
+            Initialize(config);
+        }
+
+        /// <summary>Seeds the stats from the config. Awake calls it in play
+        /// mode; EditMode tests call it directly because Unity does not run
+        /// Awake outside play mode.</summary>
+        public void Initialize(SurvivalConfigSO cfg)
+        {
+            config = cfg;
+            if (config == null)
+            {
+                Debug.LogError("[SurvivalStats] No SurvivalConfigSO assigned — stats stay at zero. Run 'Rustgame/Build Bootstrap Scene'.");
+                return;
+            }
+
             Health = MaxHealth = config.maxHealth;
             Hunger = config.hungerStart;
             Thirst = config.thirstStart;
@@ -67,7 +86,7 @@ namespace Rustgame.Player
 
         public void Tick(float dt, SurvivalEnv env)
         {
-            if (IsDead || dt <= 0) return;
+            if (IsDead || dt <= 0 || config == null) return;
             var c = config;
 
             // ---- Hunger ----
@@ -103,19 +122,24 @@ namespace Rustgame.Player
                 DamageSystem.Heal(this, c.naturalRegen * dt);
 
             GameEvents.RaiseSurvivalChanged(new SurvivalSnapshot(Health, MaxHealth, Hunger, Thirst, Stamina, Temperature, Radiation, Bleeding));
+        }
 
-            if (Health <= 0 && !IsDead)
-            {
-                IsDead = true;
-                var reason = Radiation >= c.radLethalAt ? "radiation" : Hunger <= 0 ? "hunger" : Thirst <= 0 ? "thirst" : "exhaustion";
-                GameEvents.RaisePlayerDied(reason);
-            }
+        /// <summary>Single place where "the player died" is decided. DamageSystem
+        /// calls this the moment HP hits zero, so damage from OUTSIDE the
+        /// survival tick (animals, players) kills the player too — previously
+        /// only the tick noticed a dead player.</summary>
+        public void MarkDead(string reason)
+        {
+            if (IsDead) return;
+            IsDead = true;
+            GameEvents.RaisePlayerDied(reason ?? "exhaustion");
         }
 
         /// <summary>Exact values verified from game.js doRevive() — always full
         /// stat reset, never partial, whether the player watched an ad or not.</summary>
         public void Revive()
         {
+            if (config == null) return;
             Health = config.reviveHealth;
             Hunger = config.reviveHunger;
             Thirst = config.reviveThirst;
@@ -126,6 +150,22 @@ namespace Rustgame.Player
             IsDead = false;
             transform.position = config.reviveWorldPosition;
             GameEvents.RaisePlayerRevived();
+        }
+
+        /// <summary>Restores the stat block from a save file. Called only for a
+        /// save that actually loaded (SaveReadStatus.Ok) — a fresh game keeps
+        /// the config's starting values.</summary>
+        public void RestoreStats(float health, float hunger, float thirst, float stamina,
+            float temperature, float radiation, float bleeding, bool dead)
+        {
+            Health = Mathf.Clamp(health, 0f, MaxHealth);
+            Hunger = hunger;
+            Thirst = thirst;
+            Stamina = stamina;
+            Temperature = temperature;
+            Radiation = radiation;
+            Bleeding = bleeding;
+            IsDead = dead;
         }
     }
 }

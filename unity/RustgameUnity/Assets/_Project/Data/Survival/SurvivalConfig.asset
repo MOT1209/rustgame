@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7ae99e13defe59498a94a767debdeff, type: 3}
+  m_Name: SurvivalConfig
+  m_EditorClassIdentifier: 
+  maxHealth: 100
+  maxHunger: 100
+  maxThirst: 100
+  maxStamina: 100
+  maxTemperature: 100
+  maxRadiation: 100
+  hungerStart: 100
+  hungerDrain: 0.05
+  hungerDrainSprint: 0.09
+  hungerDrainCold: 0.08
+  hungerNormalThreshold: 60
+  hungerHungryThreshold: 30
+  starvationDamage: 2
+  thirstStart: 100
+  thirstDrain: 0.08
+  thirstDrainSprint: 0.13
+  thirstNormalThreshold: 60
+  thirstThirstyThreshold: 30
+  dehydrationDamage: 2.5
+  staminaStart: 100
+  sprintDrain: 12
+  jumpDrain: 10
+  gatherDrain: 4
+  regenRate: 9
+  regenRateCold: 4
+  minimumSprintStamina: 15
+  tempStart: 100
+  tempDayRate: 1.2
+  tempNightDrain: 0.9
+  tempRainDrain: 1.6
+  tempColdWaterDrain: 2
+  freezingThreshold: 25
+  criticalThreshold: 10
+  freezingDamage: 1.5
+  campfireWarmRate: 6
+  radGainInZone: 2
+  radDecay: 1
+  radLethalAt: 100
+  radDamage: 2
+  bleedDamage: 1
+  bandageStopsBleeding: 1
+  regenHungerMin: 60
+  regenThirstMin: 50
+  naturalRegen: 1
+  dayLengthSeconds: 800
+  dayStartOffset: 300
+  autosaveIntervalSeconds: 60
+  reviveHealth: 100
+  reviveHunger: 80
+  reviveThirst: 80
+  reviveStamina: 100
+  reviveTemperature: 90
+  reviveWorldPosition: {x: 0, y: 0, z: 0}

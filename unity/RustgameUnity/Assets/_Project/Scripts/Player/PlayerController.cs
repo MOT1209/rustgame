@@ -48,7 +48,9 @@ namespace Rustgame.Player
             if (controller.isGrounded)
             {
                 verticalVelocity.y = -0.5f; // small downward force keeps isGrounded stable
-                if (jumpPressed && StaminaSystem.CanSprint(stats, survivalConfig))
+                // No stamina gate on jumping: js/player/stamina.ts drains the
+                // jump cost and clamps at 0, it never blocks the jump.
+                if (jumpPressed)
                 {
                     verticalVelocity.y = jumpForce;
                     StaminaSystem.DrainJump(stats, survivalConfig);

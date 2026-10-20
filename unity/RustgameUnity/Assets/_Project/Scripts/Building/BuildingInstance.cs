@@ -43,7 +43,15 @@ namespace Rustgame.Building
             health = tierDef.maxHealth;
         }
 
-        public void Repair(float amount) => health = Mathf.Min(MaxHealth, health + amount);
+        public void Repair(float amount) { health = Mathf.Min(MaxHealth, health + amount); }
+
+        /// <summary>Applies damage to the structure. Without this there was no
+        /// way to damage a building at all — only to repair it.</summary>
+        public void Damage(float amount)
+        {
+            if (amount <= 0) return;
+            health = Mathf.Max(0f, health - amount);
+        }
 
         public string GetPromptText(InteractionContext ctx) => isOpen ? "[E] Close door" : "[E] Open door";
 

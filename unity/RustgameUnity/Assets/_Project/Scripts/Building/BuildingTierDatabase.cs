@@ -7,7 +7,7 @@ namespace Rustgame.Building
     [CreateAssetMenu(menuName = "Rustgame/Building Tier Database", fileName = "BuildingTierDatabase")]
     public class BuildingTierDatabase : ScriptableObject
     {
-        public List<BuildingTierDefinition> tiers = new();
+        public List<BuildingTierDefinition> tiers = new List<BuildingTierDefinition>();
         [Tooltip("Verified CONFIG.TC_RADIUS from game.js — BUILDING_SYSTEM.md originally (wrongly) said 20.")]
         public float toolCupboardRadius = 25f;
 
@@ -17,7 +17,7 @@ namespace Rustgame.Building
         {
             get
             {
-                lookup ??= tiers.Where(t => t != null).ToDictionary(t => t.tier, t => t);
+                if (lookup == null) lookup = tiers.Where(t => t != null).ToDictionary(t => t.tier, t => t);
                 return lookup;
             }
         }

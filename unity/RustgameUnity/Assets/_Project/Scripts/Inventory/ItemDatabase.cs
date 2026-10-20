@@ -7,8 +7,8 @@ namespace Rustgame.Inventory
     [CreateAssetMenu(menuName = "Rustgame/Item Database", fileName = "ItemDatabase")]
     public class ItemDatabase : ScriptableObject
     {
-        public List<ItemDefinition> items = new();
-        public List<ConsumableEffect> consumableEffects = new();
+        public List<ItemDefinition> items = new List<ItemDefinition>();
+        public List<ConsumableEffect> consumableEffects = new List<ConsumableEffect>();
 
         Dictionary<string, ItemDefinition> lookup;
         Dictionary<string, ConsumableEffect> effectLookup;

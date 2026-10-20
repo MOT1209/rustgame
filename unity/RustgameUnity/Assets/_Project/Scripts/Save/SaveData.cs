@@ -17,11 +17,11 @@ namespace Rustgame.Save
 
         public int saveVersion = CurrentVersion;
         public long timestampUnixMs;
-        public PlayerSave player = new();
-        public List<InventoryEntry> inventory = new();
-        public WorldSave world = new();
-        public BuildingsSave buildings = new();
-        public TimeSave time = new();
+        public PlayerSave player = new PlayerSave();
+        public List<InventoryEntry> inventory = new List<InventoryEntry>();
+        public WorldSave world = new WorldSave();
+        public BuildingsSave buildings = new BuildingsSave();
+        public TimeSave time = new TimeSave();
 
         public static SaveData Blank() => new SaveData();
     }
@@ -31,7 +31,7 @@ namespace Rustgame.Save
     {
         public float posX, posY, posZ;
         public float rotationY;
-        public PlayerStatsSave stats = new();
+        public PlayerStatsSave stats = new PlayerStatsSave();
         public string[] belt = new string[6];
         public bool dead;
     }
@@ -55,9 +55,9 @@ namespace Rustgame.Save
         public int day = 1;
         public string weatherId = "clear";
         public float weatherTimeLeft;
-        public List<CampfireSave> campfires = new();
-        public List<StorageBoxSave> storages = new();
-        public List<RespawnEntry> respawns = new();
+        public List<CampfireSave> campfires = new List<CampfireSave>();
+        public List<StorageBoxSave> storages = new List<StorageBoxSave>();
+        public List<RespawnEntry> respawns = new List<RespawnEntry>();
     }
 
     [Serializable]
@@ -68,7 +68,7 @@ namespace Rustgame.Save
     {
         public string id;
         public float x, y, z;
-        public List<InventoryEntry> items = new();
+        public List<InventoryEntry> items = new List<InventoryEntry>();
     }
 
     [Serializable]
@@ -82,8 +82,8 @@ namespace Rustgame.Save
     [Serializable]
     public class BuildingsSave
     {
-        public List<StructureSave> structures = new();
-        public List<ToolCupboardSave> toolCupboards = new();
+        public List<StructureSave> structures = new List<StructureSave>();
+        public List<ToolCupboardSave> toolCupboards = new List<ToolCupboardSave>();
     }
 
     [Serializable]

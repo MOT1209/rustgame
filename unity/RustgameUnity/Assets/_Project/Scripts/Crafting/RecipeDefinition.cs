@@ -16,7 +16,7 @@ namespace Rustgame.Crafting
         public string id;
         public string displayName;
         public string category;
-        public List<ItemStack> ingredients = new();
+        public List<ItemStack> ingredients = new List<ItemStack>();
         public ItemStack result;
         public float craftTimeSeconds;
         public bool workbenchRequired;

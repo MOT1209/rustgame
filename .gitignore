@@ -19,6 +19,9 @@ blender_pro_skills/.env
 blender_pro_skills/cache/
 *.blend1
 
+# crash dumps from the local toolchain
+*.stackdump
+
 # browser-verification artifacts
 .playwright-mcp/
 

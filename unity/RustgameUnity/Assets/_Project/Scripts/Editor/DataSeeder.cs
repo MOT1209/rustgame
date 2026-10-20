@@ -64,9 +64,18 @@ namespace Rustgame.EditorTools
         static void EnsureFolders()
         {
             foreach (var dir in new[] { ItemsDir, RecipesDir, WorldDir, BuildingsDir, SurvivalDir })
-                if (!AssetDatabase.IsValidFolder(dir))
-                    Directory.CreateDirectory(dir);
+                EnsureFolder(dir);
             AssetDatabase.Refresh();
+        }
+
+        static void EnsureFolder(string path)
+        {
+            if (AssetDatabase.IsValidFolder(path)) return;
+            var parent = Path.GetDirectoryName(path);
+            var leaf = Path.GetFileName(path);
+            if (!string.IsNullOrEmpty(parent) && !AssetDatabase.IsValidFolder(parent))
+                EnsureFolder(parent.Replace('\\', '/'));
+            AssetDatabase.CreateFolder(parent ?? "Assets", leaf);
         }
 
         static List<ItemDefinition> ImportItems()
@@ -155,7 +164,7 @@ namespace Rustgame.EditorTools
             foreach (var e in seed.tiers)
             {
                 var asset = LoadOrCreate<BuildingTierDefinition>($"{BuildingsDir}/BuildingTier_{e.tier}.asset");
-                asset.tier = Enum.Parse<BuildingTier>(e.tier);
+                asset.tier = (BuildingTier)Enum.Parse(typeof(BuildingTier), e.tier);
                 asset.maxHealth = e.maxHealth;
                 asset.color = ParseHexColor(e.colorHex);
                 asset.repairCostFraction = 0.10f;
@@ -184,6 +193,10 @@ namespace Rustgame.EditorTools
         {
             var asset = AssetDatabase.LoadAssetAtPath<T>(path);
             if (asset != null) return asset;
+
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir)) EnsureFolder(dir.Replace('\\', '/'));
+
             asset = ScriptableObject.CreateInstance<T>();
             AssetDatabase.CreateAsset(asset, path);
             return asset;

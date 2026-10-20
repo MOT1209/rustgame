@@ -70,7 +70,7 @@ namespace Rustgame.Building
         static BuildingTier? GetNextTier(BuildingTier current)
         {
             var idx = System.Array.IndexOf(TierOrder, current);
-            return idx >= 0 && idx < TierOrder.Length - 1 ? TierOrder[idx + 1] : null;
+            return idx >= 0 && idx < TierOrder.Length - 1 ? (BuildingTier?)TierOrder[idx + 1] : null;
         }
     }
 }
