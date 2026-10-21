@@ -1,1 +1,1 @@
-{"buildNumber":15,"changelog":"Phase 1 Core Survival: stamina/temperature/bleeding systems, unified E-interaction, storage boxes, campfires + cooking, water sources, weather, save v2 with migration, craft validation fixes","releaseDate":"2026-09-24","version":"1.1.0"}
+{"buildNumber":16,"changelog":"Phase 2: animal combat with tool damage and corpse looting, smelting ore into fragments at the campfire, food spoilage with a persisted rot clock (save v4), contextual E button for touch, compass + minimap","releaseDate":"2026-10-20","version":"1.2.0"}

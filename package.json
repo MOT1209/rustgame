@@ -1,6 +1,6 @@
 {
   "name": "rust-game",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "description": "Rust-like open-world survival game (Three.js) — web, Android and Windows desktop",

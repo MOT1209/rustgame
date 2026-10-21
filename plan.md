@@ -125,7 +125,7 @@ __rustGame.snapshot()   // device, runtime, day, structures…
 | 2.2 | فرن صهر ✅ · تلف طعام ✅ | صهر عند النار: 1 حديد + 2 خشب → 1 fragment في 8 ثوانٍ (`js/world/smelting.js`) · اللحم/التوت يفسد (خام 240ث، مطبوخ 600ث، توت 180ث) ويؤكل مسموماً (-15HP) — ساعة التلف محفوظة مع الحفظ (**v4**) `js/inventory/spoilage.js` |
 | 2.3 | خريطة + بوصلة + POI ✅ | بوصلة علوية بسهم/اتجاه/مسافة لأقرب نصب + خريطة مصغّرة دوّارة (اللاعب في الوسط) — `js/world/pois.js` (14 اختبار) + `hud.js` |
 | 2.4 | موبايل: زر E سياقي ✅ | زر تفاعل سياقي على اللمس: يعرض ما سيفعله E الآن ("Open storage box") ويختفي بلا هدف — `js/input/contextual-action.js` + `setActionButton()` + CSS pill (10 اختبارات) |
-| 2.5 | QA شامل + 1.2.0 | CI أخضر + buildNumber جديد |
+| 2.5 | QA شامل + 1.2.0 ✅ | CI أخضر (7 تشغيلات) · 139/79 اختبار · `typecheck` 0 · `build` ناجح · النسخة **1.2.0 (build 16)** في `public/version.json` |
 
 ---
 
