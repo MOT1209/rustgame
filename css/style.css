@@ -125,6 +125,52 @@ html {
     text-shadow: 1px 1px 2px #000;
 }
 
+/* Phase 2.3: compass strip (top centre) + minimap (top right) */
+#compass {
+    position: absolute;
+    top: 26px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    border-radius: 18px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.2));
+    color: #fff;
+    font-size: 0.85rem;
+    text-shadow: 1px 1px 2px #000;
+    white-space: nowrap;
+}
+
+#compass-arrow {
+    font-size: 1.1rem;
+    color: var(--primary, #cd5c2c);
+}
+
+#compass-label {
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+#compass-poi {
+    opacity: 0.85;
+    font-size: 0.78rem;
+}
+
+#minimap {
+    position: absolute;
+    top: 26px;
+    right: 26px;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.2));
+    pointer-events: none;
+}
+
 .stats {
     position: absolute;
     bottom: 20px;

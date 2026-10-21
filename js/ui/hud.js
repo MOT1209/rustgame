@@ -81,3 +81,75 @@ export function setPrompt(text) {
         el.style.display = 'none';
     }
 }
+
+/**
+ * Phase 2.3: the compass readout — an arrow, the direction and the distance
+ * to the nearest point of interest. Pass null to hide the whole strip.
+ */
+export function updateCompass(readout) {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('compass');
+    if (!el) return;
+    if (!readout) {
+        if (el.style.display === 'none') return;
+        el.style.display = 'none';
+        return;
+    }
+    if (el.style.display === 'none') el.style.display = 'flex';
+    setText('compass-arrow', readout.arrow);
+    setText('compass-label', readout.label);
+    setText('compass-poi', `${readout.name} · ${Math.round(readout.distance)}m`);
+}
+
+/**
+ * Phase 2.3: the minimap. The player is always in the middle and the map is
+ * rotated so the player faces up. `points` come from js/world/pois.js.
+ */
+export function drawMinimap(points) {
+    if (typeof document === 'undefined') return;
+    const canvas = document.getElementById('minimap');
+    if (!canvas || !canvas.getContext) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // ring + north marker
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.min(cx, cy) - 4, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('N', cx, 10);
+
+    // the points of interest
+    for (const p of points || []) {
+        const px = cx + p.x;
+        const py = cy + p.y;
+        const edge = Math.hypot(px - cx, py - cy) > Math.min(cx, cy) - 6;
+        ctx.fillStyle = edge ? 'rgba(255,193,7,0.85)' : 'rgba(255,152,0,0.95)';
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // the player
+    ctx.fillStyle = '#cd5c2c';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 5);
+    ctx.lineTo(cx + 4, cy + 4);
+    ctx.lineTo(cx, cy + 2);
+    ctx.lineTo(cx - 4, cy + 4);
+    ctx.closePath();
+    ctx.fill();
+}
+

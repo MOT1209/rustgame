@@ -25,7 +25,9 @@ import { detectRuntime, loadMode, resolveDevice, saveMode } from './core/platfor
 import { InputSystem, gamepadProvider } from './input/input.js';
 import { UnifiedGameControls } from './input/touch-controls.js';
 import { CONTEXTUAL_ACTION, contextualButtonState, resolveContextualTap } from './input/contextual-action.js';
-import { updateSurvivalHud, setPrompt } from './ui/hud.js';
+import { updateSurvivalHud, setPrompt, updateCompass, drawMinimap } from './ui/hud.js';
+// Phase 2.3: points of interest, compass and minimap (pure geometry)
+import { compassReadout, minimapLayout } from './world/pois.js';
 // Phase 2: local-only perf measurement (overlay via ?perf=1 / F3 in dev, benchmarks via window.__perf).
 import { PerfMonitor, benchSeed } from './dev/perf-monitor.js';
 import { runScenario, SCENARIO_ORDER } from './dev/bench-scenarios.js';
@@ -491,8 +493,12 @@ class NPC {
 
 const radZones = [];
 const npcs = [];
+// Phase 2.3: points of interest (monuments) for the compass + minimap.
+const pois = [];
 
 function createMonument(scene, x, z) {
+    // Phase 2.3: monuments are the landmarks the compass points at.
+    pois.push({ id: `monument_${pois.length + 1}`, name: `Monument ${pois.length + 1}`, kind: 'monument', x, z });
     const tower = new THREE.Group();
     const base = new THREE.Mesh(new THREE.CylinderGeometry(4, 5, 20, 8), new THREE.MeshStandardMaterial({ color: 0x455a64 }));
     base.position.y = 10; tower.add(base);
@@ -1401,6 +1407,18 @@ try {
         applyContextualButton(null, false);
     }
     setInterval(refreshInteractPrompt, 150); // throttled: no per-frame DOM/raycast cost
+
+    // Phase 2.3: the compass and the minimap follow the player.
+    function updateNavigation() {
+        if (!pois.length) return;
+        const px = camera.position.x;
+        const pz = camera.position.z;
+        // The camera looks down -Z at yaw 0, so the player's bearing is -yaw.
+        const bearing = -camera.rotation.y;
+        updateCompass(compassReadout(px, pz, bearing, pois));
+        drawMinimap(minimapLayout(px, pz, bearing, pois));
+    }
+    setInterval(updateNavigation, 200);
 
     // Phase 2.2: warn once when food starts rotting, and forget the clocks of
     // items the player no longer carries.
