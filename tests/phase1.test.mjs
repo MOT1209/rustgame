@@ -27,7 +27,8 @@ const REG = { wood: 1, stone: 1, cloth: 1, berry: 1, bandage: 1, water: 1, canne
 // ---------- config ----------
 test('config: thirst drains faster than hunger', () => {
     assert.ok(SURVIVAL_CONFIG.thirstDrain > SURVIVAL_CONFIG.hungerDrain);
-    assert.equal(SAVE_VERSION, 3);
+    // v4 added the food spoilage clock (spoiledAt).
+    assert.equal(SAVE_VERSION, 4);
 });
 
 // ---------- damage ----------

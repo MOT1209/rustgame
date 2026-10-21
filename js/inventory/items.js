@@ -8,19 +8,19 @@ export const FOOD_DEFS = {
     berry: {
         id: 'berry', name: 'Berry', category: 'food',
         hungerRestore: 8, thirstRestore: 4, healthRestore: 0,
-        spoilTime: 0, stackSize: 20, icon: 'fa-berry', color: '#ab47bc',
+        spoilTime: 180, stackSize: 20, icon: 'fa-berry', color: '#ab47bc',
         desc: 'Wild berry. Small snack, slightly hydrating.',
     },
     raw_meat: {
         id: 'raw_meat', name: 'Raw Meat', category: 'food',
         hungerRestore: 10, thirstRestore: 0, healthRestore: -5,
-        spoilTime: 0, stackSize: 10, icon: 'fa-drumstick-bite', color: '#ef5350',
+        spoilTime: 240, stackSize: 10, icon: 'fa-drumstick-bite', color: '#ef5350',
         desc: 'Risky raw. Cook it at a campfire first.',
     },
     cooked_meat: {
         id: 'cooked_meat', name: 'Cooked Meat', category: 'food',
         hungerRestore: 35, thirstRestore: 0, healthRestore: 5,
-        spoilTime: 0, stackSize: 10, icon: 'fa-drumstick-bite', color: '#8d6e63',
+        spoilTime: 600, stackSize: 10, icon: 'fa-drumstick-bite', color: '#8d6e63',
         desc: 'Campfire-cooked. Solid meal.',
     },
     canned_food: {

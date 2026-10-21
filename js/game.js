@@ -7,6 +7,8 @@ import { DamageSystem, DamageTypes } from './player/damage.ts';
 import { StaminaSystem } from './player/stamina.ts';
 import { SurvivalSystem } from './player/survival.ts';
 import { FOOD_DEFS } from './inventory/items.js';
+// Phase 2.2: food spoilage — the rot clock (pure, testable)
+import { isSpoiled, pruneSpoilage, spoiledItemIds, spoilagePenalty, startSpoiling } from './inventory/spoilage.js';
 import { StorageInventory } from './inventory/storage.js';
 import { getRecipe, craft as craftRecipe } from './crafting/recipes.js';
 import { getNodeDef, yieldForHit } from './world/resources.js';
@@ -60,6 +62,8 @@ const state = {
         { id: 'hammer', count: 1 }
     ],
     gear: { head: null, chest: null, legs: null, feet: null },
+    // Phase 2.2: item id → epoch ms when it started rotting (persisted in v4).
+    spoiledAt: {},
     belt: ['building_plan', 'hammer', null, null, null, null],
     stats: { health: 100, hunger: 100, thirst: 100, radiation: 0, stamina: 100, temperature: 100, bleeding: 0 },
     day: 1,
@@ -265,6 +269,8 @@ function addItem(id, count) {
     let item = state.inventory.find(i => i.id === id);
     if (item) item.count += whole;
     else state.inventory.push({ id, count: whole });
+    // Phase 2.2: the rot clock starts when the player first picks the item up.
+    startSpoiling(id, state.spoiledAt, Date.now());
     updateHUD();
     return whole;
 }
@@ -303,6 +309,16 @@ function useConsumable(id) {
     const def = FOOD_DEFS[id] || ITEMS_DATA[id];
     if (!def || getItemCount(id) <= 0) return false;
     if (!consumeItem(id, 1)) return false;
+
+    // Phase 2.2: spoiled food is poison, not food.
+    const penalty = spoilagePenalty(id, state.spoiledAt, Date.now());
+    if (penalty > 0) {
+        DamageSystem.applyDamage(state.stats, penalty, DamageTypes.GENERIC);
+        showNotification(`Spoiled ${def.name}! -${penalty} HP`, '#e74c3c');
+        SoundFX.hit();
+        updateHUD();
+        return true;
+    }
     if (def.hungerRestore) state.stats.hunger = Math.min(100, state.stats.hunger + def.hungerRestore);
     if (def.thirstRestore) state.stats.thirst = Math.min(100, state.stats.thirst + def.thirstRestore);
     if (def.healthRestore) {
@@ -1386,6 +1402,20 @@ try {
     }
     setInterval(refreshInteractPrompt, 150); // throttled: no per-frame DOM/raycast cost
 
+    // Phase 2.2: warn once when food starts rotting, and forget the clocks of
+    // items the player no longer carries.
+    const warnedSpoiled = new Set();
+    function checkSpoilage() {
+        const now = Date.now();
+        pruneSpoilage(state.spoiledAt, state.inventory.map(i => i.id));
+        for (const id of spoiledItemIds(state.spoiledAt, now)) {
+            if (warnedSpoiled.has(id)) continue;
+            warnedSpoiled.add(id);
+            showNotification(`Your ${id.replace(/_/g, ' ')} is rotting`, '#e67e22');
+        }
+    }
+    setInterval(checkSpoilage, 5000);
+
     // ==================== PHASE 1: STORAGE PANEL ====================
     let storagePanel = null;
     let storagePanelOpen = false;
@@ -2394,6 +2424,8 @@ try {
                     dead: state.dead
                 },
                 inventory: state.inventory.map(i => ({ id: i.id, count: i.count })),
+                // v4: the rot clock, so reloading cannot reset it.
+                spoiledAt: { ...state.spoiledAt },
                 world: {
                     day: state.day || 1,
                     weather: weather.toJSON(),
@@ -2458,6 +2490,7 @@ try {
             SurvivalSystem.normalize(data.player.stats);
             state.stats = data.player.stats;
             state.inventory = data.inventory;
+            state.spoiledAt = data.spoiledAt || {};
             state.belt = (data.player.belt && data.player.belt.length) ? data.player.belt : state.belt;
             state.day = (data.world && data.world.day) || 1;
             state.time = data.time;

@@ -114,6 +114,19 @@ function cleanStructure(s: unknown): SaveStructure {
     };
 }
 
+/** v4: the food spoilage clock — item id → epoch ms. Older saves have none. */
+function cleanSpoiledAt(v: unknown): Record<string, number> {
+    if (!isObj(v)) return {};
+    const out: Record<string, number> = {};
+    const rec = v as Record<string, unknown>;
+    for (const key of Object.keys(rec)) {
+        const at = num(rec[key], NaN);
+        if (!Number.isFinite(at) || at <= 0) continue;
+        out[key] = at;
+    }
+    return out;
+}
+
 function cleanCampfires(v: unknown): SaveCampfire[] {
     if (!Array.isArray(v)) return [];
     const out: SaveCampfire[] = [];
@@ -168,6 +181,7 @@ export const SaveSystem = {
             world: { respawns: [], storages: [], campfires: [], day: 1, weather: null },
             buildings: { structures: [], toolCupboards: [] },
             time: 0,
+            spoiledAt: {},
         };
     },
 
@@ -261,9 +275,11 @@ export const SaveSystem = {
                         : [],
                 };
             }
-            out.saveVersion = SAVE_VERSION_CURRENT;
-            out.timestamp = num(rec['timestamp'], Date.now());
-            return out;
+                out.saveVersion = SAVE_VERSION_CURRENT;
+                out.timestamp = num(rec['timestamp'], Date.now());
+                // v4: the spoilage clock. v3 saves simply have none.
+                out.spoiledAt = cleanSpoiledAt(rec['spoiledAt']);
+                return out;
         } catch {
             return null;
         }

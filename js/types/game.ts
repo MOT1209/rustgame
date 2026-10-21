@@ -125,6 +125,8 @@ export interface SaveGame {
     world: SaveWorld;
     buildings: SaveBuildings;
     time: number;
+    /** v4: item id → epoch ms when it started rotting. Empty for older saves. */
+    spoiledAt: Record<string, number>;
 }
 
 export interface SaveAutosaver {
