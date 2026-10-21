@@ -4,8 +4,10 @@ using System.Collections.Generic;
 namespace Rustgame.Save
 {
     /// <summary>
-    /// Shape verified against game.js saveGame()/loadGame() (SAVE_VERSION 3):
-    /// { saveVersion, timestamp, player, inventory, world, buildings, time }.
+    /// Shape verified against game.js saveGame()/loadGame() (SAVE_VERSION 5):
+    /// { saveVersion, timestamp, player, inventory, world, buildings, time,
+    ///   spoiledAt }.
+    /// v4 added the food spoilage clock, v5 the placed furnaces.
     /// Kept as plain [Serializable] classes (JsonUtility-compatible — no
     /// Dictionary fields) so this can round-trip through Unity's built-in JSON
     /// without a third-party library.
@@ -13,7 +15,7 @@ namespace Rustgame.Save
     [Serializable]
     public class SaveData
     {
-        public const int CurrentVersion = 3;
+        public const int CurrentVersion = 5;
 
         public int saveVersion = CurrentVersion;
         public long timestampUnixMs;
@@ -22,8 +24,17 @@ namespace Rustgame.Save
         public WorldSave world = new WorldSave();
         public BuildingsSave buildings = new BuildingsSave();
         public TimeSave time = new TimeSave();
+        /// <summary>v4: item id → epoch ms when it started rotting.</summary>
+        public List<SpoiledEntry> spoiledAt = new List<SpoiledEntry>();
 
         public static SaveData Blank() => new SaveData();
+    }
+
+    [Serializable]
+    public class SpoiledEntry
+    {
+        public string id;
+        public long at;
     }
 
     [Serializable]
@@ -56,12 +67,17 @@ namespace Rustgame.Save
         public string weatherId = "clear";
         public float weatherTimeLeft;
         public List<CampfireSave> campfires = new List<CampfireSave>();
+        /// <summary>v5: the placed furnaces (the smelters).</summary>
+        public List<FurnaceSave> furnaces = new List<FurnaceSave>();
         public List<StorageBoxSave> storages = new List<StorageBoxSave>();
         public List<RespawnEntry> respawns = new List<RespawnEntry>();
     }
 
     [Serializable]
     public class CampfireSave { public float x, z; }
+
+    [Serializable]
+    public class FurnaceSave { public float x, z; }
 
     [Serializable]
     public class StorageBoxSave
