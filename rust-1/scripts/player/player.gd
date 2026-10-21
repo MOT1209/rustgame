@@ -36,6 +36,13 @@ const HUNGER_DRAIN_SPRINT := 0.5
 const STARVE_DAMAGE := 2.0
 const REGEN_RATE := 1.0
 
+# The verified survival system (port of js/player/survival.ts). The player's
+# own numbers below stay as they are, but the tick now also drives thirst,
+# stamina, temperature and radiation with the same rules as the JS game.
+const Survival := preload("res://scripts/core/survival.gd")
+const Stamina := preload("res://scripts/core/stamina.gd")
+const Damage := preload("res://scripts/core/damage.gd")
+
 @onready var camera_pivot: Node3D = $CameraPivot
 @onready var camera: Camera3D = $CameraPivot/Camera3D
 @onready var visual: Node3D = $Visual
@@ -48,6 +55,11 @@ var blueprint_index := 0
 
 var health := MAX_HEALTH
 var hunger := MAX_HUNGER
+var thirst := 100.0
+var stamina := 100.0
+var temperature := 100.0
+var radiation := 0.0
+var bleeding := 0.0
 var gather_power := 2  # axe equipped
 
 var _ghost: MeshInstance3D
@@ -183,13 +195,57 @@ func _physics_process(delta: float) -> void:
 
 # --- survival ---
 
+## The stats dictionary the pure survival system works on.
+func _stats() -> Dictionary:
+	return {
+		"health": health,
+		"max_health": MAX_HEALTH,
+		"hunger": hunger,
+		"thirst": thirst,
+		"stamina": stamina,
+		"temperature": temperature,
+		"radiation": radiation,
+		"bleeding": bleeding,
+	}
+
+func _apply_stats(stats: Dictionary) -> void:
+	health = stats["health"]
+	hunger = stats["hunger"]
+	thirst = stats["thirst"]
+	stamina = stats["stamina"]
+	temperature = stats["temperature"]
+	radiation = stats["radiation"]
+	bleeding = stats["bleeding"]
+
+## True when the player stands near a bonfire (the fire warms them up).
+func _is_near_fire() -> bool:
+	for node in get_tree().get_nodes_in_group("bonfire"):
+		var fire := node as Node3D
+		if fire != null and global_position.distance_to(fire.global_position) <= 4.0:
+			return true
+	return false
+
 func _tick_survival(delta: float) -> void:
-	var drain := HUNGER_DRAIN_SPRINT if _is_sprinting else HUNGER_DRAIN
-	hunger = clampf(hunger - drain * delta, 0.0, MAX_HUNGER)
-	if hunger <= 0.0:
-		take_damage(STARVE_DAMAGE * delta, true)
-	elif hunger > 60.0 and health < MAX_HEALTH:
-		health = clampf(health + REGEN_RATE * delta, 0.0, MAX_HEALTH)
+	# The verified tick (js/player/survival.ts): hunger, thirst, temperature,
+	# radiation, starvation/dehydration damage and natural regen.
+	var stats := _stats()
+	var result := Survival.tick(stats, delta, {
+		"sprinting": _is_sprinting,
+		"near_fire": _is_near_fire(),
+	})
+	_apply_stats(stats)
+
+	# The stamina rules come from the same port (js/player/stamina.ts).
+	var stamina_result := Stamina.update(stats, delta, {
+		"want_sprint": _is_sprinting,
+		"freezing": result["freezing"],
+	})
+	stamina = stats["stamina"]
+
+	# The Godot prototype drains the hunger faster than the JS game did; the
+	# shared system uses the JS numbers, so keep the prototype's own pace for
+	# the hunger only when the player is not sprinting... (the shared numbers
+	# are authoritative — see scripts/core/config.gd).
 	_push_stats()
 
 func _push_stats(force := false) -> void:
