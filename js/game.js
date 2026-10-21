@@ -10,6 +10,8 @@ import { FOOD_DEFS } from './inventory/items.js';
 import { StorageInventory } from './inventory/storage.js';
 import { getRecipe, craft as craftRecipe } from './crafting/recipes.js';
 import { getNodeDef, yieldForHit } from './world/resources.js';
+// Phase 2.2: smelting raw ore into fragments (pure, testable)
+import { SmeltSession, canSmelt, getSmeltRecipe } from './world/smelting.js';
 // Phase 2: animal combat + corpse loot (pure, testable — see tests/animals.test.ts)
 import { AnimalState, toolDamage } from './world/animals.ts';
 import { WATER_SOURCES, drink as drinkFromSource } from './world/water.js';
@@ -1210,22 +1212,68 @@ try {
             return true;
         },
     });
+    // Phase 2.2: a smelt running at the campfire (null = idle).
+    let smeltSession = null;
+
+    /** What the campfire offers right now: cook, smelt, or collect. */
+    function campfireLabel() {
+        if (getItemCount('raw_meat') > 0) return 'E — Cook raw meat';
+        if (smeltSession) {
+            if (smeltSession.isDone(Date.now())) return `E — Collect ${smeltSession.recipe.output}`;
+            return `E — Smelting ${smeltSession.recipe.input} ${smeltSession.percent(Date.now())}%`;
+        }
+        if (canSmelt('iron', getItemCount)) return 'E — Smelt iron';
+        return 'Campfire (need raw meat or ore)';
+    }
+
     interaction.register(InteractKinds.USE, {
         priority: 12,
         canInteract: (c) => !!(c && (c.kind === 'cook' || c.kind === 'place-box' || c.kind === 'place-campfire')),
         label: (c) => {
-            if (c.kind === 'cook') return getItemCount('raw_meat') > 0 ? 'E — Cook raw meat' : 'Campfire (need raw meat)';
+            if (c.kind === 'cook') return campfireLabel();
             if (c.kind === 'place-box') return 'E — Place storage box';
             return 'E — Place campfire';
         },
         act: (c) => {
             if (c.kind === 'cook') {
-                if (!consumeItem('raw_meat', 1)) { showNotification('Need raw meat', '#e74c3c'); return true; }
-                addItem('cooked_meat', 1);
-                state.stats.temperature = Math.min(100, state.stats.temperature + 5);
-                showNotification('Cooked meat (+5 warmth)', '#ff9800');
-                SoundFX.build();
-                updateHUD();
+                // Phase 2.2: a running smelt takes priority over cooking.
+                if (smeltSession) {
+                    const now = Date.now();
+                    if (!smeltSession.isDone(now)) {
+                        showNotification(`Smelting ${smeltSession.recipe.input}… ${smeltSession.percent(now)}%`, '#f39c12');
+                        return true;
+                    }
+                    const result = smeltSession.collect(now);
+                    smeltSession = null;
+                    if (result) {
+                        addItem(result.output, result.count);
+                        showNotification(`Smelted ${result.count} ${result.output}`, '#ff7043');
+                        SoundFX.build();
+                        updateHUD();
+                    }
+                    return true;
+                }
+                if (getItemCount('raw_meat') > 0) {
+                    if (!consumeItem('raw_meat', 1)) { showNotification('Need raw meat', '#e74c3c'); return true; }
+                    addItem('cooked_meat', 1);
+                    state.stats.temperature = Math.min(100, state.stats.temperature + 5);
+                    showNotification('Cooked meat (+5 warmth)', '#ff9800');
+                    SoundFX.build();
+                    updateHUD();
+                    return true;
+                }
+                if (canSmelt('iron', getItemCount)) {
+                    const recipe = getSmeltRecipe('iron');
+                    if (!consumeItem(recipe.input, 1) || !consumeItem(recipe.fuel, recipe.fuelCount)) {
+                        showNotification('Need iron and wood', '#e74c3c');
+                        return true;
+                    }
+                    smeltSession = new SmeltSession('iron', Date.now());
+                    showNotification('Smelting iron…', '#ff7043');
+                    SoundFX.build();
+                    return true;
+                }
+                showNotification('Need raw meat, or iron + wood to smelt', '#e74c3c');
                 return true;
             }
             if (c.kind === 'place-box') {
