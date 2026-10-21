@@ -1,0 +1,66 @@
+name: Godot CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'rust-1/**'
+      - 'unity/RustgameUnity/Assets/_Project/Data/Seed/**'
+      - '.github/workflows/godot-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'rust-1/**'
+      - 'unity/RustgameUnity/Assets/_Project/Data/Seed/**'
+      - '.github/workflows/godot-ci.yml'
+  workflow_dispatch:
+
+# The Godot port is the development line — its tests are the gate.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  godot-tests:
+    name: godot headless tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Godot
+        id: godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.1
+          use-dotnet: false
+          include-templates: false
+
+      - name: Import the project
+        run: godot --headless --path rust-1 --import
+
+      - name: Run the test suite
+        run: godot --headless --path rust-1 --script res://tests/run_tests.gd
+
+  seed-data-in-sync:
+    name: the seed data is identical in both ports
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compare the seed copies
+        run: |
+          set -e
+          for f in unity/RustgameUnity/Assets/_Project/Data/Seed/*.json; do
+            name=$(basename "$f")
+            if ! diff -q "$f" "rust-1/data/seed/$name" > /dev/null; then
+              echo "::error file=$name::the seed copy in rust-1/data/seed differs from the Unity one"
+              exit 1
+            fi
+          done
+          echo "the seed data is in sync"

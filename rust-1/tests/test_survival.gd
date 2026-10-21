@@ -118,9 +118,11 @@ static func run_all() -> void:
 	T.ok(result["hunger_state"] == "normal", "the tick reports the hunger state")
 
 	# --- state change events ---
+	# The hunger must CROSS a band during the tick: 60.01 is "normal",
+	# 60.00 already is "hungry" (the band is value > 60).
 	stats = _fresh()
-	stats["hunger"] = 60.0
-	result = Survival.tick(stats, 0.0, {})
+	stats["hunger"] = 60.01
+	result = Survival.tick(stats, 1.0, {})
 	T.eq(result["events"].size(), 1, "a state change raises one event")
 	T.eq(result["events"][0]["type"], "hunger", "the event names the stat")
 	T.eq(result["events"][0]["from"], "normal", "the event carries the old state")

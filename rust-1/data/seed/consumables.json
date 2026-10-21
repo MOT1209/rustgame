@@ -1,0 +1,10 @@
+{
+  "consumables": [
+    { "itemId": "berry", "hungerRestore": 8, "thirstRestore": 4, "healthRestore": 0, "spoilTimeSeconds": 0, "stopsBleeding": false },
+    { "itemId": "raw_meat", "hungerRestore": 10, "thirstRestore": 0, "healthRestore": -5, "spoilTimeSeconds": 0, "stopsBleeding": false, "note": "Negative health — risky to eat raw, matches items.js exactly." },
+    { "itemId": "cooked_meat", "hungerRestore": 35, "thirstRestore": 0, "healthRestore": 5, "spoilTimeSeconds": 0, "stopsBleeding": false },
+    { "itemId": "canned_food", "hungerRestore": 30, "thirstRestore": 5, "healthRestore": 0, "spoilTimeSeconds": 0, "stopsBleeding": false },
+    { "itemId": "water", "hungerRestore": 0, "thirstRestore": 40, "healthRestore": 0, "spoilTimeSeconds": 0, "stopsBleeding": false },
+    { "itemId": "bandage", "hungerRestore": 0, "thirstRestore": 0, "healthRestore": 25, "spoilTimeSeconds": 0, "stopsBleeding": true }
+  ]
+}
