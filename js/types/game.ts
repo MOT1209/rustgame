@@ -96,6 +96,8 @@ export interface SaveWorld {
     respawns: Array<Record<string, unknown>>;
     storages: Array<Record<string, unknown>>;
     campfires: Array<SaveCampfire>;
+    /** v5: placed furnaces — the smelters. */
+    furnaces: Array<SaveCampfire>;
     day: number;
     weather: Record<string, unknown> | null;
 }

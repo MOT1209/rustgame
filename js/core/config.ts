@@ -11,7 +11,8 @@ import type { SurvivalConfig } from '../types/game.ts';
 //   v2 — versioned/validated save (stats normalized, A/B storage slots)
 //   v3 — world objects: campfires + per-structure door state (isDoor/isOpen)
 //   v4 — food spoilage clock (spoiledAt: item id → epoch ms)
-export const SAVE_VERSION = 4;
+//   v5 — placed furnaces (world.furnaces: {x,z}[])
+export const SAVE_VERSION = 5;
 export const SAVE_KEY = 'rust_survival_save';
 
 export const SURVIVAL_CONFIG: SurvivalConfig = {

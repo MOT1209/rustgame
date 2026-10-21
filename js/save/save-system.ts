@@ -178,7 +178,7 @@ export const SaveSystem = {
                 dead: false,
             },
             inventory: [],
-            world: { respawns: [], storages: [], campfires: [], day: 1, weather: null },
+            world: { respawns: [], storages: [], campfires: [], furnaces: [], day: 1, weather: null },
             buildings: { structures: [], toolCupboards: [] },
             time: 0,
             spoiledAt: {},
@@ -262,6 +262,8 @@ export const SaveSystem = {
                         : [],
                     // v2 saves simply have no campfires — default to none.
                     campfires: cleanCampfires(w['campfires']),
+                    // v5 added the placed furnaces — v4 saves simply have none.
+                    furnaces: cleanCampfires(w['furnaces']),
                     day: Math.max(1, Math.floor(num(w['day'], 1))),
                     weather: isObj(w['weather']) ? w['weather'] : null,
                 };

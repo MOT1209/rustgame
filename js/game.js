@@ -1015,6 +1015,7 @@ try {
     try { inputSys.addProvider(gamepadProvider(0)); } catch (_) {}
     const storageBoxes = [];  // { id, mesh, inv: StorageInventory, pos }
     const campfires = [];     // { mesh, light, pos }
+    const furnaces = [];      // { mesh, light, pos } — the smelters
     const waterBodies = [];   // { mesh, source: {type, level}, pos, radius }
     let storageSeq = 0;
     let currentInteractTarget = null; // set by the E prompter
@@ -1109,6 +1110,24 @@ try {
         return entry;
     }
     spawnStorageBox(-4, 3, null); // camp box
+
+    // ---- Furnaces (smelting) ----
+    const furnaceStoneMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.9 });
+    const furnaceGlowMat = new THREE.MeshStandardMaterial({ color: 0xff6d00, emissive: 0xff3d00, emissiveIntensity: 2.5 });
+    function placeFurnace(x, z) {
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.0), furnaceStoneMat);
+        body.position.y = 0.6; g.add(body);
+        const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.12), furnaceGlowMat);
+        mouth.position.set(0, 0.5, 0.54); g.add(mouth);
+        const light = new THREE.PointLight(0xff6d00, 6, 8, 2);
+        light.position.set(0, 0.7, 0.85); g.add(light);
+        g.position.set(x, surfaceY(x, z), z);
+        g.userData = { type: 'furnace', radius: 0.9 };
+        scene.add(g); interactables.push(g); collisionObjects.push(g);
+        furnaces.push({ mesh: g, light, pos: { x, z } });
+        return g;
+    }
 
     // ---- Campfires (warmth + cooking) ----
     const stoneMat2 = new THREE.MeshStandardMaterial({ color: 0x757575, roughness: 1 });
@@ -1234,31 +1253,47 @@ try {
             return true;
         },
     });
-    // Phase 2.2: a smelt running at the campfire (null = idle).
+    // Phase 2.2: a smelt running in a furnace (null = idle).
     let smeltSession = null;
 
-    /** What the campfire offers right now: cook, smelt, or collect. */
+    /** What the campfire offers right now: cook. */
     function campfireLabel() {
         if (getItemCount('raw_meat') > 0) return 'E — Cook raw meat';
+        return 'Campfire (need raw meat)';
+    }
+
+    /** What the furnace offers right now: smelt or collect. */
+    function furnaceLabel() {
         if (smeltSession) {
             if (smeltSession.isDone(Date.now())) return `E — Collect ${smeltSession.recipe.output}`;
             return `E — Smelting ${smeltSession.recipe.input} ${smeltSession.percent(Date.now())}%`;
         }
         if (canSmelt('iron', getItemCount)) return 'E — Smelt iron';
-        return 'Campfire (need raw meat or ore)';
+        return 'Furnace (need iron + wood)';
     }
 
     interaction.register(InteractKinds.USE, {
         priority: 12,
-        canInteract: (c) => !!(c && (c.kind === 'cook' || c.kind === 'place-box' || c.kind === 'place-campfire')),
+        canInteract: (c) => !!(c && (c.kind === 'cook' || c.kind === 'smelt' || c.kind === 'place-box' || c.kind === 'place-campfire' || c.kind === 'place-furnace')),
         label: (c) => {
             if (c.kind === 'cook') return campfireLabel();
+            if (c.kind === 'smelt') return furnaceLabel();
             if (c.kind === 'place-box') return 'E — Place storage box';
+            if (c.kind === 'place-furnace') return 'E — Place furnace';
             return 'E — Place campfire';
         },
         act: (c) => {
             if (c.kind === 'cook') {
-                // Phase 2.2: a running smelt takes priority over cooking.
+                if (!consumeItem('raw_meat', 1)) { showNotification('Need raw meat', '#e74c3c'); return true; }
+                addItem('cooked_meat', 1);
+                state.stats.temperature = Math.min(100, state.stats.temperature + 5);
+                showNotification('Cooked meat (+5 warmth)', '#ff9800');
+                SoundFX.build();
+                updateHUD();
+                return true;
+            }
+            if (c.kind === 'smelt') {
+                // Phase 2.2: smelt in the furnace — start, wait, collect.
                 if (smeltSession) {
                     const now = Date.now();
                     if (!smeltSession.isDone(now)) {
@@ -1275,15 +1310,6 @@ try {
                     }
                     return true;
                 }
-                if (getItemCount('raw_meat') > 0) {
-                    if (!consumeItem('raw_meat', 1)) { showNotification('Need raw meat', '#e74c3c'); return true; }
-                    addItem('cooked_meat', 1);
-                    state.stats.temperature = Math.min(100, state.stats.temperature + 5);
-                    showNotification('Cooked meat (+5 warmth)', '#ff9800');
-                    SoundFX.build();
-                    updateHUD();
-                    return true;
-                }
                 if (canSmelt('iron', getItemCount)) {
                     const recipe = getSmeltRecipe('iron');
                     if (!consumeItem(recipe.input, 1) || !consumeItem(recipe.fuel, recipe.fuelCount)) {
@@ -1295,13 +1321,21 @@ try {
                     SoundFX.build();
                     return true;
                 }
-                showNotification('Need raw meat, or iron + wood to smelt', '#e74c3c');
+                showNotification('Need iron + wood to smelt', '#e74c3c');
                 return true;
             }
             if (c.kind === 'place-box') {
                 if (!consumeItem('wooden_box', 1)) return true;
                 spawnStorageBox(c.point.x, c.point.z, null);
                 showNotification('Storage box placed', '#2ecc71');
+                SoundFX.build();
+                updateHUD();
+                return true;
+            }
+            if (c.kind === 'place-furnace') {
+                if (!consumeItem('furnace', 1)) return true;
+                placeFurnace(c.point.x, c.point.z);
+                showNotification('Furnace placed', '#ff7043');
                 SoundFX.build();
                 updateHUD();
                 return true;
@@ -1372,6 +1406,10 @@ try {
             else if (ud.type === 'water') kind = 'drink';
             else if (ud.type === 'crate' || ud.type === 'animal_corpse') kind = 'loot';
             else if (ud.type === 'door') kind = 'door';
+            else if (ud.type === 'furnace') {
+                const d = Math.sqrt((camera.position.x - root.position.x) ** 2 + (camera.position.z - root.position.z) ** 2);
+                if (d < 3.5) kind = 'smelt';
+            }
             else if (ud.type === 'campfire') {
                 const d = Math.sqrt((camera.position.x - root.position.x) ** 2 + (camera.position.z - root.position.z) ** 2);
                 if (d < 3.5) kind = 'cook';
@@ -1394,6 +1432,12 @@ try {
                 currentInteractTarget = { kind: 'place-box', point: gHits[0].point };
                 setPrompt('E — Place storage box');
                 applyContextualButton('E — Place storage box', true);
+                return;
+            }
+            if (getItemCount('furnace') > 0) {
+                currentInteractTarget = { kind: 'place-furnace', point: gHits[0].point };
+                setPrompt('E — Place furnace');
+                applyContextualButton('E — Place furnace', true);
                 return;
             }
             if (getItemCount('campfire') > 0) {
@@ -2448,6 +2492,7 @@ try {
                     day: state.day || 1,
                     weather: weather.toJSON(),
                     campfires: campfires.map(c => ({ x: c.pos.x, z: c.pos.z })),
+                    furnaces: furnaces.map(f => ({ x: f.pos.x, z: f.pos.z })),
                     storages: storageBoxes.map(b => ({ id: b.id, x: b.pos.x, y: b.pos.y, z: b.pos.z, inv: b.inv.toJSON() })),
                     respawns: respawnQueue.map(r => ({
                         type: r.type,
@@ -2561,6 +2606,23 @@ try {
             if (data.world && Array.isArray(data.world.campfires)) {
                 for (const c of data.world.campfires) {
                     if (c && Number.isFinite(c.x) && Number.isFinite(c.z)) placeCampfire(c.x, c.z);
+                }
+            }
+
+            // Restore furnaces (v5): clear existing ones first (idempotent load).
+            for (const f of furnaces.slice()) {
+                scene.remove(f.mesh);
+                for (const arr of [interactables, collisionObjects]) {
+                    const i = arr.indexOf(f.mesh);
+                    if (i !== -1) arr.splice(i, 1);
+                }
+                if (f.light && f.light.parent) f.light.parent.remove(f.light);
+                f.mesh.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+                furnaces.splice(furnaces.indexOf(f), 1);
+            }
+            if (data.world && Array.isArray(data.world.furnaces)) {
+                for (const f of data.world.furnaces) {
+                    if (f && Number.isFinite(f.x) && Number.isFinite(f.z)) placeFurnace(f.x, f.z);
                 }
             }
 
