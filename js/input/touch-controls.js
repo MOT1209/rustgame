@@ -147,6 +147,35 @@ export class UnifiedGameControls {
         button.style.borderColor = def.color || 'rgba(255,255,255,0.25)';
         if (def.hold) button.dataset.hold = '1';
         this.bindButton(button, def);
+        if (!this.nodes.buttonsByAction) this.nodes.buttonsByAction = {};
+        this.nodes.buttonsByAction[def.action] = button;
+        return button;
+    }
+
+    /**
+     * Updates an action button at runtime — label and/or visibility.
+     * The contextual interact button uses this: its label follows whatever
+     * the E key would do right now, and it hides itself when there is
+     * nothing to interact with.
+     */
+    setActionButton(action, { label, visible } = {}) {
+        const button = this.nodes.buttonsByAction && this.nodes.buttonsByAction[action];
+        if (!button) return null;
+
+        // The prompt refresher runs on a timer, so only touch the DOM when
+        // something actually changed — this runs on a phone.
+        if (label !== undefined && label !== null) {
+            const next = String(label);
+            if (button.textContent !== next) {
+                button.textContent = next;
+                // A word label needs a different shape than a round icon button.
+                button.classList.toggle('has-label', next.length > 2);
+            }
+        }
+        if (visible !== undefined) {
+            const shouldHide = !visible;
+            if (button.hidden !== shouldHide) button.hidden = shouldHide;
+        }
         return button;
     }
 

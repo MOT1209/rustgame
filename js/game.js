@@ -20,6 +20,7 @@ import { SaveSystem } from './save/save-system.ts';
 import { detectRuntime, loadMode, resolveDevice, saveMode } from './core/platform.ts';
 import { InputSystem, gamepadProvider } from './input/input.js';
 import { UnifiedGameControls } from './input/touch-controls.js';
+import { CONTEXTUAL_ACTION, contextualButtonState, resolveContextualTap } from './input/contextual-action.js';
 import { updateSurvivalHud, setPrompt } from './ui/hud.js';
 // Phase 2: local-only perf measurement (overlay via ?perf=1 / F3 in dev, benchmarks via window.__perf).
 import { PerfMonitor, benchSeed } from './dev/perf-monitor.js';
@@ -1271,13 +1272,24 @@ try {
         }
     }, true);
 
+    // Phase 2.4: the phone has no E key, but E is the backbone of the game
+    // (storage box, drink, cook, loot a crate, loot a corpse). The touch
+    // button shows what E would do right now and hides itself when there is
+    // nothing to interact with.
+    let contextualButtonController = null;
+    function applyContextualButton(prompt, hasTarget) {
+        if (!contextualButtonController) return;
+        const st = contextualButtonState({ prompt, hasTarget });
+        contextualButtonController.setActionButton(CONTEXTUAL_ACTION, { label: st.label, visible: st.visible });
+    }
+
     const _promptRay = new THREE.Raycaster();
     function refreshInteractPrompt() {
         currentInteractTarget = null;
-        if (state.dead) { setPrompt(null); return; }
+        if (state.dead) { setPrompt(null); applyContextualButton(null, false); return; }
         if (typeof pointerControls !== 'undefined' && !pointerControls.isLocked && isTouchDevice === false) {
             // Only prompt while playing (pointer locked) on desktop.
-            if (document.getElementById('inventory').style.display === 'flex') { setPrompt(null); return; }
+            if (document.getElementById('inventory').style.display === 'flex') { setPrompt(null); applyContextualButton(null, false); return; }
         }
         _promptRay.setFromCamera(new THREE.Vector2(0, 0), camera);
         const hits = _promptRay.intersectObjects([...interactables, ...builtStructures], true);
@@ -1300,6 +1312,7 @@ try {
                 if (found) {
                     currentInteractTarget = target;
                     setPrompt(found.label);
+                    applyContextualButton(found.label, true);
                     return;
                 }
             }
@@ -1310,15 +1323,18 @@ try {
             if (getItemCount('wooden_box') > 0) {
                 currentInteractTarget = { kind: 'place-box', point: gHits[0].point };
                 setPrompt('E — Place storage box');
+                applyContextualButton('E — Place storage box', true);
                 return;
             }
             if (getItemCount('campfire') > 0) {
                 currentInteractTarget = { kind: 'place-campfire', point: gHits[0].point };
                 setPrompt('E — Place campfire');
+                applyContextualButton('E — Place campfire', true);
                 return;
             }
         }
         setPrompt(null);
+        applyContextualButton(null, false);
     }
     setInterval(refreshInteractPrompt, 150); // throttled: no per-frame DOM/raycast cost
 
@@ -2025,6 +2041,23 @@ try {
     });
 
     // ==================== ADVANCED UNIFIED CONTROLS (v3.0) ====================
+    /** Opens/closes the inventory panel — shared by the Tab key, the 🎒 button
+     *  and the contextual E fallback. */
+    function toggleInventoryPanel() {
+        const inv = document.getElementById('inventory');
+        if (inv.style.display === 'flex') {
+            inv.style.display = 'none';
+            if (!isTouchDevice) pointerControls.lock();
+        } else {
+            inv.style.display = 'flex';
+            pointerControls.unlock();
+            renderCraftingGrid();
+            renderInventoryGrid();
+            renderBelt();
+            initPlayerPreview();
+        }
+    }
+
     const gameControls = new UnifiedGameControls({
         requireLandscape: true,
         showCameraControls: true, // Rust needs camera control
@@ -2033,7 +2066,8 @@ try {
             { id: 'attack', label: '⚔️', action: 'attack', key: 'KeyF', color: '#e74c3c' },
             { id: 'build', label: '🏗️', action: 'build', key: 'KeyB', color: '#f39c12' },
             { id: 'jump', label: '⬆️', action: 'jump', key: 'Space', color: '#3498db' },
-            { id: 'inventory', label: '🎒', action: 'inventory', key: 'KeyE', color: '#9b59b6' },
+            { id: 'inventory', label: '🎒', action: 'inventory', key: 'Tab', color: '#9b59b6' },
+            { id: 'interact', label: '✋', action: 'interact', key: 'KeyE', color: '#e67e22' },
             { id: 'crouch', label: '🔽', action: 'crouch', key: 'ControlLeft', color: '#34495e' },
             { id: 'view', label: '👁️', action: 'view', key: 'KeyV', color: '#1abc9c' },
             { id: 'sprint', label: '💨', action: 'sprint', key: 'ShiftLeft', color: '#27ae60', hold: true }
@@ -2077,19 +2111,16 @@ try {
                     }
                     break;
                 case 'inventory':
-                    const inv = document.getElementById('inventory');
-                    if (inv.style.display === 'flex') {
-                        inv.style.display = 'none';
-                        if (!isTouchDevice) pointerControls.lock();
-                    } else {
-                        inv.style.display = 'flex';
-                        pointerControls.unlock();
-                        renderCraftingGrid();
-                        renderInventoryGrid();
-                        renderBelt();
-                        initPlayerPreview();
-                    }
+                    toggleInventoryPanel();
                     break;
+                case 'interact': {
+                    // Phase 2.4: the contextual E — interact with what is in
+                    // front of the player, otherwise open the inventory.
+                    const mode = resolveContextualTap({ hasTarget: !!currentInteractTarget });
+                    if (mode === 'interact' && currentInteractTarget) doInteract(currentInteractTarget);
+                    else toggleInventoryPanel();
+                    break;
+                }
                 case 'crouch':
                     state.controls.crouch = !state.controls.crouch;
                     camera.position.y = state.controls.crouch ? 1.2 : 1.8;
@@ -2110,6 +2141,7 @@ try {
         },
         debug: false
     });
+    contextualButtonController = gameControls;
     
     // Initial device scheme (replaces the unconditional touch init).
     applyDeviceMode(loadMode(localStorage));

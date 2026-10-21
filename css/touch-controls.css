@@ -17,6 +17,25 @@
     opacity: 0.75;
 }
 
+/* A hidden button must really disappear — .mobile-btn sets display:flex,
+   which would otherwise beat the [hidden] attribute. */
+#mobile-controls .mobile-btn[hidden] {
+    display: none;
+}
+
+/* The contextual interact button carries a word ("Open storage box"), not an
+   icon, so it becomes a pill. Still a 44px-tall touch target. */
+#mobile-controls .mobile-btn.has-label {
+    width: auto;
+    min-width: 70px;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 22px;
+    font-size: 0.85rem;
+    line-height: 1.15;
+    text-align: center;
+}
+
 #joystick-zone {
     touch-action: none;
 }
@@ -56,6 +75,14 @@
         width: 58px;
         height: 58px;
         font-size: 1.15rem;
+    }
+
+    #action-buttons .mobile-btn.has-label {
+        width: auto;
+        min-width: 58px;
+        height: 44px;
+        padding: 0 10px;
+        font-size: 0.75rem;
     }
 
     #joystick-zone {
